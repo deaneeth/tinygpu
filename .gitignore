@@ -1,0 +1,5 @@
+test_assembler.py
+test_gpu_core.py
+test_gpu.py
+test_programs.py
+
