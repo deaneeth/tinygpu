@@ -1,0 +1,7 @@
+; Threads increment local register and then sync before writing to memory
+SET R0, 0           ; local counter
+ADD R0, R0, 1       ; increment once
+SYNC                ; barrier: all threads must reach here
+SET R1, 16
+ADD R1, R1, R7      ; R1 = 16 + tid
+ST R1, R0           ; write R0 to memory[16+tid]
