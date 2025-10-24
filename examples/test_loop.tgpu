@@ -1,0 +1,7 @@
+; Sum 1..4 in R0
+SET R0, 0
+SET R1, 1
+loop:
+ADD R0, R0, R1
+ADD R1, R1, 1
+BNE R1, 5, loop

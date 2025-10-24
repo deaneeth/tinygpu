@@ -5,7 +5,6 @@ from tinygpu.gpu import TinyGPU
 from tinygpu.assembler import assemble_file
 from tinygpu.visualizer import visualize
 
-
 # Path to program
 example_path = os.path.join(os.path.dirname(__file__), "vector_add.tgpu")
 

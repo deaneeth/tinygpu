@@ -28,9 +28,6 @@ class TinyGPU:
 
         self.program = []
         self.labels = {}
-        
-     
-
 
     def load_program(self, program, labels):
         self.program = program
@@ -38,15 +35,19 @@ class TinyGPU:
         self.pc[:] = 0
 
     def step(self):
-        # Execute one cycle for all threads (lockstep execution)
+        # execute one instruction per active thread
         for tid in range(self.num_threads):
-            if self.pc[tid] < len(self.program):
-                instr, args = self.program[self.pc[tid]]
-                if instr in INSTRUCTIONS:
-                    INSTRUCTIONS[instr](self, tid, *args)
-                self.pc[tid] += 1
+            if self.pc[tid] < 0 or self.pc[tid] >= len(self.program):
+                continue  # thread finished
+            instr, args = self.program[self.pc[tid]]
+            func = INSTRUCTIONS.get(instr)
+            if func:
+                before_pc = self.pc[tid]
+                func(self, tid, *args)
+                # if instruction didn’t modify PC (e.g., ALU op), increment
+                if self.pc[tid] == before_pc:
+                    self.pc[tid] += 1
 
-        # Record state for visualization
         self.history_registers.append(self.registers.copy())
         self.history_memory.append(self.memory.copy())
 
