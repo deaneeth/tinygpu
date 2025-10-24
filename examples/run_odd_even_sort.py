@@ -36,6 +36,7 @@ arr = np.random.randint(0, 100, size=ARRAY_LEN)
 print("Initial array:", arr.tolist())
 for i in range(ARRAY_LEN):
     gpu.memory[MEM_BASE + i] = int(arr[i])
+gpu.memory[MEM_BASE + ARRAY_LEN] = 9999   # sentinel guard value
 
 # load program and run
 gpu.load_program(program, labels)
