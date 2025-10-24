@@ -68,6 +68,25 @@ def op_sync(gpu, tid):
     gpu.sync_waiting[tid] = True
     # do not advance PC here; core will advance the waiting threads when all reached
 
+def op_cswap(gpu, tid, addr_a_operand, addr_b_operand):
+    """
+    Compare-and-swap on global memory:
+      if memory[a] > memory[b]: swap memory[a], memory[b]
+    addr operands can be immediates or register operands.
+    """
+    a = int(_resolve(gpu, tid, addr_a_operand))
+    b = int(_resolve(gpu, tid, addr_b_operand))
+
+    # bounds check (defensive)
+    if a < 0 or a >= gpu.mem_size or b < 0 or b >= gpu.mem_size:
+        return
+
+    va = int(gpu.memory[a])
+    vb = int(gpu.memory[b])
+    if va > vb:
+        gpu.memory[a], gpu.memory[b] = vb, va
+
+
 INSTRUCTIONS = {
     "SET": op_set,
     "ADD": op_add,
@@ -78,4 +97,5 @@ INSTRUCTIONS = {
     "BEQ": op_beq,
     "BNE": op_bne,
     "SYNC": op_sync,
+    "CSWAP": op_cswap,
 }

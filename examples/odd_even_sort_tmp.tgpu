@@ -1,0 +1,25 @@
+; odd-even transposition sort using CSWAP
+; Assumes array length N (number of elements) is in driver and number of threads = N//2
+; R7 is thread id (initialized by TinyGPU)
+
+SET R0, 0        ; phase_counter
+SET R1, 16        ; num_phases == N (set to array length here, adjust in runner)
+SET R3, 0        ; parity (0 = even phase, 1 = odd phase)
+
+loop_phase:
+    ; compute base index = tid * 2
+    MUL R4, R7, 2      ; R4 = tid * 2
+    ADD R5, R4, R3     ; R5 = index = tid*2 + parity
+    ADD R6, R5, 1      ; R6 = index + 1
+    CSWAP R5, R6       ; compare & swap memory[index], memory[index+1]
+    SYNC               ; synchronize threads across the phase
+
+    ADD R3, R3, 1      ; parity = parity + 1
+    BNE R3, 2, noreset
+    SET R3, 0
+noreset:
+    ADD R0, R0, 1
+    BNE R0, R1, loop_phase
+
+done:
+    JMP done
