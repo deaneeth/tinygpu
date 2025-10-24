@@ -1,6 +1,15 @@
 ; Each thread computes C[i] = A[i] + B[i]
 
-LD R0, 0
-LD R1, 8
+SET R3, 0
+ADD R4, R7, R3
+LD R0, R4
+
+SET R3, 8
+ADD R5, R7, R3
+LD R1, R5
+
 ADD R2, R0, R1
-ST 16, R2
+
+SET R3, 16
+ADD R6, R7, R3
+ST R6, R2

@@ -3,12 +3,18 @@ from .instructions import INSTRUCTIONS
 
 class TinyGPU:
     def __init__(self, num_threads=8, num_registers=8, mem_size=256):
+        
         self.num_threads = num_threads
         self.num_registers = num_registers
         self.mem_size = mem_size
 
+        # Initialize registers
+        self.registers = np.zeros((num_threads, num_registers), dtype=np.int32)
+
         # Each thread has its own register file
         self.registers = np.zeros((num_threads, num_registers), dtype=np.int32)
+        for tid in range(self.num_threads):
+            self.registers[tid, 7] = tid  # R7 = thread_id
 
         # Shared global memory
         self.memory = np.zeros(mem_size, dtype=np.int32)
@@ -22,6 +28,9 @@ class TinyGPU:
 
         self.program = []
         self.labels = {}
+        
+     
+
 
     def load_program(self, program, labels):
         self.program = program

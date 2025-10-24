@@ -29,6 +29,12 @@ for instr, args in program:
 
 # Run program
 gpu.run(max_cycles=20)
+print("Memory A:", gpu.memory[:8])
+print("Memory B:", gpu.memory[8:16])
+print("Memory C:", gpu.memory[16:24])
+for t in range(gpu.num_threads):
+    print(f"Thread {t}  R7(thread_id)={gpu.registers[t,7]}  R0={gpu.registers[t,0]}  R1={gpu.registers[t,1]}  R2={gpu.registers[t,2]}")
+    print(f"Thread {t}  R3={gpu.registers[t,3]}  R4={gpu.registers[t,4]}  R5={gpu.registers[t,5]}  R6={gpu.registers[t,6]}")
 
 # Print result memory (C[0..7] should be A[i]+B[i])
 print("Result C:", gpu.memory[16:24])
