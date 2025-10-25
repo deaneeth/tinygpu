@@ -1,9 +1,10 @@
 # examples/run_odd_even_sort.py
 import os
+import time
 import numpy as np
 from src.tinygpu.gpu import TinyGPU
 from src.tinygpu.assembler import assemble_file
-from src.tinygpu.visualizer import visualize
+from src.tinygpu.visualizer import visualize, save_animation
 
 # configuration
 ARRAY_LEN = 16            # must be even for odd-even transposition; adjust as needed
@@ -38,19 +39,32 @@ for i in range(ARRAY_LEN):
     gpu.memory[MEM_BASE + i] = int(arr[i])
 gpu.memory[MEM_BASE + ARRAY_LEN] = 9999   # sentinel guard value
 
-# run...
+# load program and run
 gpu.load_program(program, labels)
 gpu.run(max_cycles=MAX_CYCLES)
 
+# print result
 sorted_arr = [int(gpu.memory[MEM_BASE + i]) for i in range(ARRAY_LEN)]
 print("Sorted array:", sorted_arr)
 
-# Save gif
-from src.tinygpu.visualizer import save_animation
-out_gif = os.path.join(os.path.dirname(__file__), "odd_even_sort.gif")
-save_animation(gpu, out_path=out_gif, fps=12, max_frames=200, dpi=110)
-print("Saved GIF:", out_gif)
+# produce gif (limit frames to 200 to avoid huge files)
+script_name = os.path.splitext(os.path.basename(__file__))[0]  # e.g., run_reduce_sum
+output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", script_name)
+os.makedirs(output_dir, exist_ok=True)
 
+timestamp = time.strftime("%Y%m%d-%H%M%S")
+out_gif = os.path.join(output_dir, f"{script_name}_{timestamp}.gif")
 
-# visualize
+save_animation(
+    gpu,
+    out_path=out_gif,
+    fps=10,
+    max_frames=200,
+    dpi=100,
+)
+
+print("Saved GIF:", os.path.abspath(out_gif))
+
+# Force visualize array region only
+gpu.mem_size = ARRAY_LEN  # restrict memory plot to array region
 visualize(gpu, show_pc=True)
