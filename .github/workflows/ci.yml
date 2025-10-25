@@ -48,4 +48,6 @@ jobs:
       - name: 🧪 Install package (editable) and run pytest
         run: |
           pip install -e .[dev]
-          PYTHONPATH=src pytest -v --maxfail=1 --disable-warnings
+          echo "Listing repo files:"; ls -la
+          echo "Listing tests dir:"; ls -la tests || true
+          PYTHONPATH=src pytest tests -v --maxfail=1 --disable-warnings
