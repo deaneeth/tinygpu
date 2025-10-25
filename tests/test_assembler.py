@@ -1,4 +1,3 @@
-
 import tempfile
 import os
 from tinygpu.assembler import assemble_file
