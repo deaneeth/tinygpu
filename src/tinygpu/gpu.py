@@ -1,7 +1,7 @@
-# src/tinygpu/gpu.py
 import numpy as np
 from .instructions import INSTRUCTIONS
 
+# TinyGPU core class definition 
 class TinyGPU:
     def __init__(self, num_threads=8, num_registers=8, mem_size=256):
         self.num_threads = num_threads

@@ -1,4 +1,3 @@
-# src/tinygpu/visualizer.py
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,7 +5,7 @@ import tempfile
 import shutil
 import imageio
 
-
+# Simple static visualization of TinyGPU execution history 
 def visualize(gpu, show_pc=True):
     """
     Simple static visualization (like earlier working version).
@@ -20,6 +19,7 @@ def visualize(gpu, show_pc=True):
         print("No history recorded. Run gpu.run(...) first.")
         return
 
+    # Get number of cycles recorded 
     cycles = reg_hist.shape[0]
 
     # Reshape registers to (threads*regs, cycles)
@@ -35,12 +35,14 @@ def visualize(gpu, show_pc=True):
     else:
         start, end = 0, min(32, gpu.mem_size)  # fallback small window
 
+    # Plotting 
     fig, axs = plt.subplots(3 if show_pc else 2, 1, figsize=(12, 8),
                             gridspec_kw={'height_ratios': [2, 1, 0.5] if show_pc else [2, 1]})
     ax_regs = axs[0]
     ax_mem = axs[1]
     ax_pc  = axs[2] if show_pc else None
 
+    # Registers (threads*regs x cycles) 
     im1 = ax_regs.imshow(regs_reshaped, aspect='auto', cmap='inferno', origin='lower')
     ax_regs.set_title("Registers over time (threads × regs)")
     fig.colorbar(im1, ax=ax_regs, label='value')
@@ -51,6 +53,7 @@ def visualize(gpu, show_pc=True):
     ax_mem.set_title("Memory over time (active slice)")
     fig.colorbar(im2, ax=ax_mem, label='value')
 
+    # Program Counter per thread 
     if show_pc:
         pcs = pc_hist.T
         im3 = ax_pc.imshow(pcs, aspect='auto', cmap='viridis', origin='lower')
@@ -60,7 +63,7 @@ def visualize(gpu, show_pc=True):
     plt.tight_layout()
     plt.show()
 
-
+# Full TinyGPU execution animation and GIF saving 
 def save_animation(gpu, out_path="tinygpu_run.gif", fps=10, max_frames=200, dpi=100):
     """
     Full TinyGPU v3~v4 style animation:
@@ -100,6 +103,7 @@ def save_animation(gpu, out_path="tinygpu_run.gif", fps=10, max_frames=200, dpi=
     tmpdir = tempfile.mkdtemp(prefix="tinygpu_frames_")
     frame_files = []
 
+    # generate frames 
     for i, frame_idx in enumerate(indices):
         fig, axs = plt.subplots(3, 1, figsize=(8, 6), dpi=dpi,
                                 gridspec_kw={'height_ratios': [2, 1, 0.5]})
@@ -114,8 +118,6 @@ def save_animation(gpu, out_path="tinygpu_run.gif", fps=10, max_frames=200, dpi=
 
         # --- MEMORY cumulative ---
         mem_frame = mem_hist[:frame_idx + 1, mem_start:mem_end].T
-        mem_slice = gpu.memory[:ARRAY_LEN]
-
         ax_mem.imshow(mem_frame, aspect='auto', cmap='plasma', origin='lower', vmin=vmin, vmax=vmax)
         ax_mem.set_title(f"Memory over time (up to cycle {frame_idx})")
         ax_mem.set_xlabel("Cycle")
@@ -138,6 +140,7 @@ def save_animation(gpu, out_path="tinygpu_run.gif", fps=10, max_frames=200, dpi=
     target_shape = min(img.shape[:2] for img in imgs)
     imgs = [img[:target_shape[0], :target_shape[1]] for img in imgs]
 
+    # save gif 
     imageio.mimsave(out_path, imgs, fps=fps, loop=0)
     shutil.rmtree(tmpdir, ignore_errors=True)
     print(f"✅ GIF saved: {out_path}")

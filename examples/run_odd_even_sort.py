@@ -1,4 +1,3 @@
-# examples/run_odd_even_sort.py
 import os
 import time
 import numpy as np
@@ -7,9 +6,9 @@ from src.tinygpu.assembler import assemble_file
 from src.tinygpu.visualizer import visualize, save_animation
 
 # configuration
-ARRAY_LEN = 16            # must be even for odd-even transposition; adjust as needed
+ARRAY_LEN = 16                                      # must be even for odd-even transposition; adjust as needed
 NUM_THREADS = ARRAY_LEN // 2
-MEM_BASE = 0              # start of array in memory
+MEM_BASE = 0                                        # start of array in memory
 MEM_SIZE = 256
 MAX_CYCLES = 400
 
@@ -48,13 +47,15 @@ sorted_arr = [int(gpu.memory[MEM_BASE + i]) for i in range(ARRAY_LEN)]
 print("Sorted array:", sorted_arr)
 
 # produce gif (limit frames to 200 to avoid huge files)
-script_name = os.path.splitext(os.path.basename(__file__))[0]  # e.g., run_reduce_sum
+script_name = os.path.splitext(os.path.basename(__file__))[0]                               # e.g., run_reduce_sum
 output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", script_name)
 os.makedirs(output_dir, exist_ok=True)
 
+# create timestamped output path
 timestamp = time.strftime("%Y%m%d-%H%M%S")
 out_gif = os.path.join(output_dir, f"{script_name}_{timestamp}.gif")
 
+# Save gif
 save_animation(
     gpu,
     out_path=out_gif,

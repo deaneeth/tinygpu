@@ -86,7 +86,7 @@ def op_cswap(gpu, tid, addr_a_operand, addr_b_operand):
     if va > vb:
         gpu.memory[a], gpu.memory[b] = vb, va
 
-
+# Instruction set mapping 
 INSTRUCTIONS = {
     "SET": op_set,
     "ADD": op_add,
