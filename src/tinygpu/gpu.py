@@ -114,8 +114,8 @@ class TinyGPU:
                     # increment to next instruction
                     self.pc[tid] = before_pc + 1
 
-    # handle global barrier:
-    # if any thread is waiting at a sync point, check if we can release
+        # handle global barrier:
+        # if any thread is waiting at a sync point, check if we can release
         if self.sync_waiting.any():
             # crude policy: release when all active threads have sync_waiting True
             # only consider threads that are still active
