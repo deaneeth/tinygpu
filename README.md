@@ -9,6 +9,8 @@ It models a small **SIMT (Single Instruction, Multiple Threads)** system with pe
 
 > 🎓 *Built for learning and visualization - see how threads, registers, and memory interact across cycles!*
 
+![bubblesort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif)
+
 ---
 
 ## ✨ Highlights
@@ -33,7 +35,7 @@ It models a small **SIMT (Single Instruction, Multiple Threads)** system with pe
 
 | Odd-Even Sort | Reduction |
 |---------------|------------|
-| ![Odd-Even Sort](outputs\run_odd_even_sort\run_odd_even_sort_20251025-205516.gif) | ![Reduction](outputs\run_reduce_sum\run_reduce_sum_20251025-210237.gif) |
+| ![Odd-Even Sort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif) | ![Reduction](outputs/run_reduce_sum/run_reduce_sum_20251025-210237.gif) |
 
 ---
 
