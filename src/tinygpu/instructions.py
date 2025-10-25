@@ -6,11 +6,13 @@ def _resolve(gpu, tid, operand):
     else:
         return operand
 
+
 def op_set(gpu, tid, rd_operand, imm_operand):
     if not (isinstance(rd_operand, tuple) and rd_operand[0] == "R"):
         raise TypeError("SET target must be a register")
     rd = rd_operand[1]
     gpu.registers[tid, rd] = _resolve(gpu, tid, imm_operand)
+
 
 def op_add(gpu, tid, rd_operand, op1, op2):
     if not (isinstance(rd_operand, tuple) and rd_operand[0] == "R"):
@@ -20,6 +22,7 @@ def op_add(gpu, tid, rd_operand, op1, op2):
     v2 = _resolve(gpu, tid, op2)
     gpu.registers[tid, rd] = int(v1 + v2)
 
+
 def op_mul(gpu, tid, rd_operand, op1, op2):
     if not (isinstance(rd_operand, tuple) and rd_operand[0] == "R"):
         raise TypeError("MUL target must be a register")
@@ -27,6 +30,7 @@ def op_mul(gpu, tid, rd_operand, op1, op2):
     v1 = _resolve(gpu, tid, op1)
     v2 = _resolve(gpu, tid, op2)
     gpu.registers[tid, rd] = int(v1 * v2)
+
 
 def op_ld(gpu, tid, rd_operand, addr_operand):
     if not (isinstance(rd_operand, tuple) and rd_operand[0] == "R"):
@@ -36,16 +40,20 @@ def op_ld(gpu, tid, rd_operand, addr_operand):
     a = int(a)
     gpu.registers[tid, rd] = int(gpu.memory[a])
 
+
 def op_st(gpu, tid, addr_operand, rs_operand):
     a = int(_resolve(gpu, tid, addr_operand))
     val = int(_resolve(gpu, tid, rs_operand))
     gpu.memory[a] = val
-    
- # control flow ops
+
+
+# control flow ops
+
 
 def op_jmp(gpu, tid, target):
     # set PC to target (target expected to be an immediate int)
     gpu.pc[tid] = int(_resolve(gpu, tid, target))
+
 
 def op_beq(gpu, tid, op1, op2, target):
     if _resolve(gpu, tid, op1) == _resolve(gpu, tid, op2):
@@ -54,11 +62,13 @@ def op_beq(gpu, tid, op1, op2, target):
         # increment will be handled by core step (if unchanged)
         gpu.pc[tid] = int(gpu.pc[tid])
 
+
 def op_bne(gpu, tid, op1, op2, target):
     if _resolve(gpu, tid, op1) != _resolve(gpu, tid, op2):
         gpu.pc[tid] = int(_resolve(gpu, tid, target))
     else:
         gpu.pc[tid] = int(gpu.pc[tid])
+
 
 def op_sync(gpu, tid):
     """
@@ -67,6 +77,7 @@ def op_sync(gpu, tid):
     """
     gpu.sync_waiting[tid] = True
     # do not advance PC here; core will advance the waiting threads when all reached
+
 
 def op_cswap(gpu, tid, addr_a_operand, addr_b_operand):
     """
@@ -86,13 +97,14 @@ def op_cswap(gpu, tid, addr_a_operand, addr_b_operand):
     if va > vb:
         gpu.memory[a], gpu.memory[b] = vb, va
 
-# Instruction set mapping 
+
+# Instruction set mapping
 INSTRUCTIONS = {
     "SET": op_set,
     "ADD": op_add,
     "MUL": op_mul,
-    "LD":  op_ld,
-    "ST":  op_st,
+    "LD": op_ld,
+    "ST": op_st,
     "JMP": op_jmp,
     "BEQ": op_beq,
     "BNE": op_bne,

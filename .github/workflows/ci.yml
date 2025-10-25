@@ -24,11 +24,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install dependencies (including dev extras)
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest ruff black
+          pip install -e .[dev]
+          pip install ruff
 
       # -----------------------------
       # Code quality
@@ -36,7 +36,7 @@ jobs:
       - name: 🧹 Run Ruff linter (auto-fix mode)
         run: |
           ruff check . --fix
-        continue-on-error: false  # set true if you want lint warnings but no CI failure
+        continue-on-error: false
 
       - name: 🎨 Check formatting (Black)
         run: |

@@ -8,3 +8,5 @@ __pycache__/
 *.py[cod]
 *.pyc
 *$py.class
+/.pytest_cache
+
