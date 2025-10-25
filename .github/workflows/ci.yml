@@ -48,4 +48,4 @@ jobs:
       - name: 🧪 Install package (editable) and run pytest
         run: |
           pip install -e .[dev]
-          pytest -v --maxfail=1 --disable-warnings
+          PYTHONPATH=src pytest -v --maxfail=1 --disable-warnings
