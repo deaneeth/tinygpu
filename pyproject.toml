@@ -1,30 +1,24 @@
 [project]
 name = "tinygpu"
 version = "1.0.0"
-description = "TinyGPU - a minimal educational GPU simulator (SIMT) with visualizations and examples."
+description = "A tiny educational GPU simulator for learning SIMT architecture, branching, and synchronization."
 readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
 authors = [
-  { name="DIneth Hettiarachchi", email="dnethusahan.h05@gmail.com" }
+  { name = "Dineth Hettiarachchi", email = "hettiarachchidineth00@gmail.com" }
 ]
-license = "MIT"
-requires-python = ">=3.8"
-keywords = ["gpu", "simulator", "education", "visualization", "simt"]
-classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
+
+dependencies = [
+  "numpy>=1.25",
+  "matplotlib>=3.7",
+  "imageio>=2.26"
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/deaneeth/tinygpu"
-"Repository" = "https://github.com/deaneeth/tinygpu"
+Homepage = "https://github.com/your-github-user/tinygpu"
+Repository = "https://github.com/your-github-user/tinygpu"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[project.dependencies]
-numpy = "^1.25"
-matplotlib = "^3.7"
-imageio = "^2.26"
-# add pytest for dev, don't include in runtime
