@@ -1,14 +1,16 @@
 import os
 import time
 import numpy as np
-from src.tinygpu.gpu import TinyGPU
-from src.tinygpu.assembler import assemble_file
-from src.tinygpu.visualizer import visualize, save_animation
+from tinygpu.gpu import TinyGPU
+from tinygpu.assembler import assemble_file
+from tinygpu.visualizer import visualize, save_animation
 
 # ---- config ----
-ARRAY_LEN = 8                                     # must be power of two
+ARRAY_LEN = 8  # must be power of two
 NUM_THREADS = ARRAY_LEN // 2
-MEM_SIZE = ARRAY_LEN + 1 + 64       # array + result + buffer | e.g. 8 + 1 + 64 = 73, any cushion is fine
+MEM_SIZE = (
+    ARRAY_LEN + 1 + 64
+)  # array + result + buffer | e.g. 8 + 1 + 64 = 73, any cushion is fine
 MAX_CYCLES = 80
 # ----------------
 
@@ -19,14 +21,14 @@ program, labels = assemble_file(prog_path)
 # create gpu with enough registers (R0-R9 used)
 gpu = TinyGPU(num_threads=NUM_THREADS, num_registers=12, mem_size=MEM_SIZE)
 
-# initialize array in memory to sum over 
+# initialize array in memory to sum over
 arr = np.random.randint(1, 10, size=ARRAY_LEN)
 print("Initial array:", arr.tolist())
 for i in range(ARRAY_LEN):
     gpu.memory[i] = int(arr[i])
-gpu.memory[ARRAY_LEN:ARRAY_LEN+10] = 0  # clear some buffer space
+gpu.memory[ARRAY_LEN : ARRAY_LEN + 10] = 0  # clear some buffer space
 
-# load program and run 
+# load program and run
 gpu.load_program(program, labels)
 gpu.run(max_cycles=MAX_CYCLES)
 
@@ -48,11 +50,11 @@ out_gif = os.path.join(output_dir, f"{script_name}_{timestamp}.gif")
 
 # Save animation
 save_animation(
-                            gpu, 
-                            out_path=out_gif, 
-                            fps=10, 
-                            max_frames=200,
-                            dpi=100,
-                        )
+    gpu,
+    out_path=out_gif,
+    fps=10,
+    max_frames=200,
+    dpi=100,
+)
 
 print("Saved GIF:", os.path.abspath(out_gif))

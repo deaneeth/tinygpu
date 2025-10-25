@@ -1,7 +1,7 @@
 import os
-from src.tinygpu.gpu import TinyGPU
-from src.tinygpu.assembler import assemble_file
-from src.tinygpu.visualizer import visualize
+from tinygpu.gpu import TinyGPU
+from tinygpu.assembler import assemble_file
+from tinygpu.visualizer import visualize
 
 # Path to sync test program
 example_path = os.path.join(os.path.dirname(__file__), "sync_test.tgpu")

@@ -16,8 +16,25 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-github-user/tinygpu"
-Repository = "https://github.com/your-github-user/tinygpu"
+Homepage = "https://github.com/deaneeth/tinygpu"
+Repository = "https://github.com/deaneeth/tinygpu"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  # Ruff is not included here due to compatibility issues with Python 3.13. Install separately if needed.
+  "black>=24.10",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C", "Q", "B", "A"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311", "py312"]
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]

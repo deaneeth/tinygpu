@@ -1,7 +1,8 @@
 import numpy as np
 from .instructions import INSTRUCTIONS
 
-# TinyGPU core class definition 
+
+# TinyGPU core class definition
 class TinyGPU:
     def __init__(self, num_threads=8, num_registers=8, mem_size=256):
         self.num_threads = num_threads
@@ -25,8 +26,8 @@ class TinyGPU:
 
         # histories for visualization
         self.history_registers = []  # list of arrays shape=(num_threads, num_registers)
-        self.history_memory = []     # list of arrays shape=(mem_size,)
-        self.history_pc = []         # list of pc array shape=(num_threads,)
+        self.history_memory = []  # list of arrays shape=(mem_size,)
+        self.history_pc = []  # list of pc array shape=(num_threads,)
 
         self.program = []
         self.labels = {}
@@ -53,11 +54,44 @@ class TinyGPU:
     def step(self):
         """
         Execute one cycle: each active thread executes the instruction at its PC.
-        Instructions that modify PC are expected to set self.pc[tid] inside the instruction.
-        If an instruction doesn't change PC, we increment it by 1 automatically.
-        SYNC instructions should set sync_waiting[tid] = True and then the core will release them
-        when all threads have reached the same sync point (or simple condition).
+        Instructions that modify PC are expected to set self.pc[tid] inside the
+        instruction. If an instruction doesn't change PC, we increment it by 1
+        automatically. SYNC instructions should set sync_waiting[tid] = True and then
+        the core will release them when all threads have reached the same sync point
+        (or simple condition).
         """
+        self._execute_threads()
+        self._handle_global_barrier()
+        self._record_state()
+
+    def _execute_threads(self):
+        for tid in range(self.num_threads):
+            if not self.active[tid]:
+                continue
+            if self.pc[tid] < 0 or self.pc[tid] >= len(self.program):
+                self.active[tid] = False
+                continue
+            instr, args = self.program[self.pc[tid]]
+            func = INSTRUCTIONS.get(instr)
+            before_pc = int(self.pc[tid])
+            if func:
+                func(self, tid, *args)
+                if int(self.pc[tid]) == before_pc and not self.sync_waiting[tid]:
+                    self.pc[tid] = before_pc + 1
+
+    def _handle_global_barrier(self):
+        if self.sync_waiting.any():
+            active_waiting = self.sync_waiting[self.active]
+            if active_waiting.size > 0 and active_waiting.all():
+                for tid in range(self.num_threads):
+                    if self.active[tid] and self.sync_waiting[tid]:
+                        self.pc[tid] = int(self.pc[tid]) + 1
+                        self.sync_waiting[tid] = False
+
+    def _record_state(self):
+        self.history_registers.append(self.registers.copy())
+        self.history_memory.append(self.memory.copy())
+        self.history_pc.append(self.pc.copy())
         # Loop threads and execute their instruction if active and in-range
         for tid in range(self.num_threads):
             if not self.active[tid]:
@@ -80,7 +114,8 @@ class TinyGPU:
                     # increment to next instruction
                     self.pc[tid] = before_pc + 1
 
-        # handle global barrier: if any thread is waiting at a sync point, check if we can release
+    # handle global barrier:
+    # if any thread is waiting at a sync point, check if we can release
         if self.sync_waiting.any():
             # crude policy: release when all active threads have sync_waiting True
             # only consider threads that are still active
@@ -98,7 +133,7 @@ class TinyGPU:
         self.history_pc.append(self.pc.copy())
 
     def run(self, max_cycles=1000):
-        for cycle in range(max_cycles):
+        for _cycle in range(max_cycles):
             if not self.active.any():
                 break
             self.step()
