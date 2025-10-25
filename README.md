@@ -1,9 +1,7 @@
-<div align="center">
-
 # TinyGPU 🐉⚡  
 
 [![PyPI version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://pypi.org/project/tinygpu)
-[![Python 3.13.5](https://img.shields.io/badge/Python-3.13.5-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/deaneeth/tinygpu/actions/workflows/ci.yml/badge.svg)](https://github.com/deaneeth/tinygpu/actions)
 
@@ -13,7 +11,6 @@ TinyGPU is a **tiny educational GPU simulator** - inspired by [Tiny8](https://gi
 
 ![bubblesort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif)
 
-</div>
 ---
 
 ## 💡 Why TinyGPU?
