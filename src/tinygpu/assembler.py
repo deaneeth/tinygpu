@@ -1,4 +1,3 @@
-
 def _strip_and_remove_comment(line):
     line = line.strip()
     if not line:
@@ -6,6 +5,7 @@ def _strip_and_remove_comment(line):
     if ";" in line:
         line = line.split(";", 1)[0].strip()
     return line
+
 
 def _collect_labels(lines):
     labels = {}
@@ -21,6 +21,7 @@ def _collect_labels(lines):
         pc += 1
     return labels
 
+
 def _parse_args(parts, labels):
     args = []
     for token in parts[1:]:
@@ -31,6 +32,7 @@ def _parse_args(parts, labels):
         else:
             args.append(labels.get(token, token))
     return args
+
 
 def assemble_file(path):
     """
