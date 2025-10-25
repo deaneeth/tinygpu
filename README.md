@@ -1,18 +1,57 @@
+<div align="center">
+
 # TinyGPU 🐉⚡  
 
 [![PyPI version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://pypi.org/project/tinygpu)
+[![Python 3.13.5](https://img.shields.io/badge/Python-3.13.5-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/deaneeth/tinygpu/actions/workflows/ci.yml/badge.svg)](https://github.com/deaneeth/tinygpu/actions)
 
-TinyGPU is a **tiny educational GPU simulator** - inspired by [Tiny8](https://github.com/sql-hkr/tiny8), designed to demonstrate how GPUs execute code in parallel.  
-It models a small **SIMT (Single Instruction, Multiple Threads)** system with per-thread registers, global memory, synchronization barriers, branching, and a minimal GPU-like instruction set.
+TinyGPU is a **tiny educational GPU simulator** - inspired by [Tiny8](https://github.com/sql-hkr/tiny8), designed to demonstrate how GPUs execute code in parallel. It models a small **SIMT (Single Instruction, Multiple Threads)** system with per-thread registers, global memory, synchronization barriers, branching, and a minimal GPU-like instruction set.
 
 > 🎓 *Built for learning and visualization - see how threads, registers, and memory interact across cycles!*
 
 ![bubblesort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif)
 
+</div>
 ---
 
+## 💡 Why TinyGPU?
+
+TinyGPU was built as a **learning-first GPU simulator** - simple enough for beginners, but powerful enough to illustrate real GPU execution concepts like threads, synchronization, and divergence.
+
+- ⚡ **Lightweight:**  
+  Zero heavy dependencies - runs entirely in Python with clean, readable code.
+- 🧩 **Educational:**  
+  Demonstrates GPU fundamentals: thread execution, shared memory, branching, and synchronization barriers.
+- 🔁 **Fast feedback loop:**  
+  Write a `.tgpu` file, run it, and instantly visualize how your threads interact.
+- 🧠 **Extensible:**  
+  Add your own instructions, modify architecture parameters, or visualize new metrics.
+- 🎨 **Visual clarity:**  
+  Each program can be rendered as a heatmap or exported as a GIF - perfect for teaching and demos.
+
+---
+
+## 👥 Who Should Use It?
+
+- 🧑‍🎓 **Students** - learn GPU basics through hands-on examples.  
+- 👩‍🏫 **Educators** - build step-by-step visual lessons about parallel computing.  
+- 🧑‍🔬 **Researchers & hobbyists** - prototype kernel logic or explore synchronization models.  
+- 💡 **Developers** - experiment with SIMD-style concepts without real GPU dependencies.
+
+---
+
+## 🚦 Get Started
+
+1. **Install & run locally** - see the [Quickstart](#-quickstart) section below.  
+2. **Explore the examples** - try `vector_add`, `odd_even_sort`, and `reduce_sum` kernels.  
+3. **Visualize execution** - watch registers, memory, and threads evolve in real-time.  
+4. **Experiment!** - tweak instruction behavior or add your own to understand how GPUs schedule and synchronize work.
+
+> 🧭 TinyGPU aims to make GPU learning *intuitive, visual, and interactive* - from classroom demos to self-guided exploration.
+
+---
 ## ✨ Highlights
 
 - 🧩 **GPU-like instruction set:**  
@@ -218,15 +257,6 @@ black --check src/ tests/
 ```
 
 CI builds and runs tests automatically on push/pull.
-
----
-
-## 👩‍💻 Who Is This For?
-
-* 🧑‍🎓 **Students** learning parallel computing and GPU basics.
-* 👩‍🏫 **Educators** creating visual demos for lectures.
-* ⚙️ **Hobbyists** exploring assembly-level programming.
-* 💡 **Developers** prototyping GPU kernels and visualization tools.
 
 ---
 
