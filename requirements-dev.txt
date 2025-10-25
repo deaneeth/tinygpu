@@ -1,0 +1,9 @@
+pytest
+numpy
+matplotlib
+imageio
+ruff
+shutil
+
+
+
