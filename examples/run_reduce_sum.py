@@ -41,7 +41,9 @@ visualize(gpu, show_pc=True)
 
 # Save gif
 script_name = os.path.splitext(os.path.basename(__file__))[0]  # e.g., run_reduce_sum
-output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", script_name)
+output_dir = os.path.join(
+    os.path.dirname(__file__), "..", "src", "outputs", script_name
+)
 os.makedirs(output_dir, exist_ok=True)
 
 # create timestamped output path

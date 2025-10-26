@@ -1,0 +1,37 @@
+; block_shared_sum.tgpu
+; R5 = block_id, R6 = thread_in_block, R7 = tid
+; R0 -> temp
+; R1 -> base (global base index for each block is block_id * block_stride)
+; We'll assume runner sets up base_addr per block in memory (or use a simple scheme)
+
+; Each thread loads its input and stores it into shared[thread_in_block]
+; Then threads synchronize at block barrier and thread 0 sums the shared
+; values and writes the block sum to memory at address (100 + block_id).
+
+; Load own value from memory[tid] (R7 contains tid)
+LD R3, R7            ; R3 = memory[tid]
+SHST R6, R3          ; shared[thread_in_block] = R3
+SYNCB                ; wait for block
+
+; Only thread with thread_in_block == 0 performs the reduction
+CMP R6, 0
+BRGT not_zero        ; if R6 > 0 jump to not_zero (i.e., only R6==0 continues)
+
+SET R4, 0            ; R4 = sum
+SET R2, 0            ; R2 = loop index
+sum_loop:
+    SHLD R0, R2      ; R0 = shared[R2]
+    ADD R4, R4, R0   ; R4 += R0
+    ADD R2, R2, 1
+    CMP R2, 4        ; compare with TPB (4)
+    BRLT sum_loop
+
+; write sum to memory at 100 + block_id (R5 holds block_id)
+SET R1, 100
+ADD R1, R1, R5
+ST R1, R4
+
+JMP done_block
+not_zero:
+done_block:
+; end
