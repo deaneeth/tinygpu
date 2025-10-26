@@ -1,8 +1,13 @@
 import os
-import numpy as np
-from src.tinygpu.assembler import assemble_file
-from src.tinygpu.gpu import TinyGPU
-from src.tinygpu.visualizer import visualize, save_animation
+import sys
+
+# make local 'src' package available so imports resolve when running this script
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, src_path)
+
+from tinygpu.assembler import assemble_file  # noqa: E402
+from tinygpu.gpu import TinyGPU  # noqa: E402
+from tinygpu.visualizer import visualize, save_animation  # noqa: E402
 
 # config
 ARRAY_LEN = 8
@@ -23,14 +28,28 @@ for i in range(ARRAY_LEN):
     gpu.memory[8 + i] = i * 2
 
 # launch kernel: grid = (blocks, threads_per_block)
-gpu.load_kernel(program, labels=labels, grid=(NUM_BLOCKS, TPB), args=None, shared_size=0)
+gpu.load_kernel(
+    program, labels=labels, grid=(NUM_BLOCKS, TPB), args=None, shared_size=0
+)
 
 # run
 gpu.run_kernel(max_cycles=MAX_CYCLES)
 
 # inspect results (C at 16..)
-print("Result C:", gpu.memory[16:16 + ARRAY_LEN].tolist())
+print("Result C:", gpu.memory[16 : 16 + ARRAY_LEN].tolist())
 visualize(gpu, show_pc=True)
+# Save animation GIF to src/outputs/<script_name>/
+try:
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    output_dir = os.path.join(
+        os.path.dirname(__file__), "..", "src", "outputs", script_name
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    import time
 
-# optional gif
-# save_animation(gpu, out_path=os.path.join(os.path.dirname(__file__), "vector_add_kernel.gif"), fps=12, max_frames=120)
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    out_gif = os.path.join(output_dir, f"{script_name}_{timestamp}.gif")
+    save_animation(gpu, out_path=out_gif, fps=12, max_frames=120, dpi=100)
+    print("Saved GIF:", os.path.abspath(out_gif))
+except Exception as e:
+    print("Could not save GIF:", e)
