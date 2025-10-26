@@ -166,6 +166,85 @@ class TinyGPU:
             if not self.active.any():
                 break
             self.step()
+            
+     # --- Step debugger helpers ---
+
+    def step_single(self):
+        """
+        Execute exactly one cycle and record state (alias to step()).
+        Useful for interactive stepping.
+        """
+        self.step()
+
+    def snapshot(self, mem_slice=None, regs_threads=None):
+        """
+        Return a human-friendly snapshot of current state.
+        - mem_slice: (start, end) to extract part of global memory (tuple) or None for full memory.
+        - regs_threads: list of thread indices to show registers for, or None for all.
+        Returns a dict.
+        """
+        if mem_slice:
+            start, end = mem_slice
+            mem_view = self.memory[start:end].tolist()
+        else:
+            mem_view = self.memory.tolist()
+
+        if regs_threads is None:
+            regs_view = {tid: self.registers[tid, :].tolist() for tid in range(self.num_threads)}
+        else:
+            regs_view = {tid: self.registers[tid, :].tolist() for tid in regs_threads}
+
+        return {
+            "cycle": len(self.history_pc),
+            "pc": self.pc.tolist(),
+            "active": self.active.tolist(),
+            "flags": self.flags.tolist(),
+            "registers": regs_view,
+            "memory_slice": mem_view,
+            "shared": self.shared.copy().tolist() if hasattr(self, "shared") else None
+        }
+
+    def rewind(self, cycles=1):
+        """
+        Rewind simulation by 'cycles' steps using stored history.
+        Note: this only restores state from history arrays, and discards newer history.
+        """
+        if cycles <= 0:
+            return
+
+        if cycles > len(self.history_registers):
+            raise ValueError("Not enough history to rewind that many cycles.")
+
+        # target index after rewind
+        target = len(self.history_registers) - cycles
+        # restore last snapshot at index target-1 if target>0 else initial
+        if target == 0:
+            # reset to initial empty state
+            self.registers[:] = 0
+            self.memory[:] = 0
+            self.pc[:] = 0
+            self.flags[:] = 0
+            if hasattr(self, "shared"):
+                self.shared[:] = 0
+            self.history_registers = []
+            self.history_memory = []
+            self.history_pc = []
+            self.history_flags = []
+            self.history_shared = []
+        else:
+            self.registers[:] = self.history_registers[target - 1].copy()
+            self.memory[:] = self.history_memory[target - 1].copy()
+            self.pc[:] = self.history_pc[target - 1].copy()
+            self.flags[:] = self.history_flags[target - 1].copy()
+            if hasattr(self, "shared") and len(self.history_shared) >= target:
+                self.shared[:] = self.history_shared[target - 1].copy()
+            # trim history
+            self.history_registers = self.history_registers[:target]
+            self.history_memory = self.history_memory[:target]
+            self.history_pc = self.history_pc[:target]
+            self.history_flags = self.history_flags[:target]
+            self.history_shared = self.history_shared[:target]            
+            
 
     def load_kernel(self, program, labels=None, grid=(1, None), args=None, shared_size=0):
         """
