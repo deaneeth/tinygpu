@@ -139,6 +139,64 @@ def op_brz(gpu, tid, target):
     else:
         gpu.pc[tid] = int(gpu.pc[tid])
 
+
+def op_shld(gpu, tid, rd_operand, saddr_operand):
+    """
+    SHLD Rd, saddr  -> Rd = shared[block_id][saddr]
+    saddr can be immediate or register operand.
+    """
+    if not (isinstance(rd_operand, tuple) and rd_operand[0] == "R"):
+        raise TypeError("SHLD target must be a register")
+    rd = rd_operand[1]
+    # resolve shared address index
+    sidx = int(_resolve(gpu, tid, saddr_operand))
+    # bounds check
+    if sidx < 0 or sidx >= gpu.shared_size:
+        gpu.registers[tid, rd] = 0
+        return
+    # determine block id from tid and current threads_per_block (more robust
+    # than relying on register R5 which user code can overwrite)
+    if getattr(gpu, "threads_per_block", 0) > 0:
+        block_id = int(tid // gpu.threads_per_block)
+    else:
+        block_id = int(gpu.registers[tid, 5]) if gpu.num_registers > 5 else 0
+
+    # bounds-check block_id against allocated shared memory
+    if block_id < 0 or block_id >= getattr(gpu, "num_blocks", 1):
+        gpu.registers[tid, rd] = 0
+        return
+
+    gpu.registers[tid, rd] = int(gpu.shared[block_id, sidx])
+
+
+def op_shst(gpu, tid, saddr_operand, rs_operand):
+    """
+    SHST saddr, Rs  -> shared[block_id][saddr] = Rs
+    """
+    sidx = int(_resolve(gpu, tid, saddr_operand))
+    if sidx < 0 or sidx >= gpu.shared_size:
+        return
+    # determine block id from tid and current threads_per_block to avoid
+    # relying on register R5 which user code may overwrite
+    if getattr(gpu, "threads_per_block", 0) > 0:
+        block_id = int(tid // gpu.threads_per_block)
+    else:
+        block_id = int(gpu.registers[tid, 5]) if gpu.num_registers > 5 else 0
+    val = int(_resolve(gpu, tid, rs_operand))
+    # bounds-check block_id before writing
+    if block_id < 0 or block_id >= getattr(gpu, "num_blocks", 1):
+        return
+    gpu.shared[block_id, sidx] = val
+
+
+def op_syncb(gpu, tid):
+    """
+    Block barrier: mark this thread as waiting at block-level barrier.
+    The core's step() will release the whole block when every active thread in that block waits.
+    """
+    gpu.sync_waiting_block[tid] = True
+
+
 # Instruction set mapping
 INSTRUCTIONS = {
     "SET": op_set,
@@ -155,4 +213,7 @@ INSTRUCTIONS = {
     "BRGT": op_brgt,
     "BRLT": op_brlt,
     "BRZ": op_brz,
+    "SHLD": op_shld,
+    "SHST": op_shst,
+    "SYNCB": op_syncb
 }
