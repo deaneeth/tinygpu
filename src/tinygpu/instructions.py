@@ -97,6 +97,7 @@ def op_cswap(gpu, tid, addr_a_operand, addr_b_operand):
     if va > vb:
         gpu.memory[a], gpu.memory[b] = vb, va
 
+
 # Flags helper: set bitmask in gpu.flags[tid]
 def _set_flags_from_result(gpu, tid, diff):
     """
@@ -107,9 +108,10 @@ def _set_flags_from_result(gpu, tid, diff):
       bit2 (4): G (greater)  if diff >  0
     """
     z = 1 if diff == 0 else 0
-    n = 1 if diff <  0 else 0
-    g = 1 if diff >  0 else 0
+    n = 1 if diff < 0 else 0
+    g = 1 if diff > 0 else 0
     gpu.flags[tid] = (z << 0) | (n << 1) | (g << 2)
+
 
 # CMP Ra, Rb
 def op_cmp(gpu, tid, op1, op2):
@@ -118,6 +120,7 @@ def op_cmp(gpu, tid, op1, op2):
     diff = int(v1) - int(v2)
     _set_flags_from_result(gpu, tid, diff)
 
+
 # BRGT target    -> branch if greater (G bit set)
 def op_brgt(gpu, tid, target):
     if (gpu.flags[tid] & 0b100) != 0:
@@ -125,12 +128,14 @@ def op_brgt(gpu, tid, target):
     else:
         gpu.pc[tid] = int(gpu.pc[tid])  # leave unchanged (core increments)
 
+
 # BRLT target    -> branch if less (N bit set)
 def op_brlt(gpu, tid, target):
     if (gpu.flags[tid] & 0b010) != 0:
         gpu.pc[tid] = int(_resolve(gpu, tid, target))
     else:
         gpu.pc[tid] = int(gpu.pc[tid])
+
 
 # BRZ target     -> branch if equal (Z bit set)
 def op_brz(gpu, tid, target):
@@ -192,7 +197,8 @@ def op_shst(gpu, tid, saddr_operand, rs_operand):
 def op_syncb(gpu, tid):
     """
     Block barrier: mark this thread as waiting at block-level barrier.
-    The core's step() will release the whole block when every active thread in that block waits.
+    The core's step() will release the whole block when every active
+    thread in that block waits.
     """
     gpu.sync_waiting_block[tid] = True
 
@@ -215,5 +221,5 @@ INSTRUCTIONS = {
     "BRZ": op_brz,
     "SHLD": op_shld,
     "SHST": op_shst,
-    "SYNCB": op_syncb
+    "SYNCB": op_syncb,
 }
