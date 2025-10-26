@@ -9,7 +9,9 @@ TinyGPU is a **tiny educational GPU simulator** - inspired by [Tiny8](https://gi
 
 > 🎓 *Built for learning and visualization - see how threads, registers, and memory interact across cycles!*
 
-![bubblesort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif)
+| Odd-Even Sort | Reduction |
+|---------------|------------|
+| ![Odd-Even Sort](outputs/run_odd_even_sort/run_odd_even_sort_20251025-205516.gif) | ![Reduction](outputs/run_reduce_sum/run_reduce_sum_20251025-210237.gif) |
 
 ---
 
