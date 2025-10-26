@@ -1,9 +1,15 @@
 import os
+import sys
 import time
 import numpy as np
-from tinygpu.gpu import TinyGPU
-from tinygpu.assembler import assemble_file
-from src.tinygpu.visualizer import visualize, save_animation
+
+# make local 'src' package available so imports resolve when running this script
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, src_path)
+
+from tinygpu.gpu import TinyGPU  # noqa: E402
+from tinygpu.assembler import assemble_file  # noqa: E402
+from tinygpu.visualizer import visualize, save_animation  # noqa: E402
 
 # configuration
 ARRAY_LEN = 16  # must be even for odd-even transposition; adjust as needed
@@ -48,7 +54,9 @@ print("Sorted array:", sorted_arr)
 
 # produce gif (limit frames to 200 to avoid huge files)
 script_name = os.path.splitext(os.path.basename(__file__))[0]  # e.g., run_reduce_sum
-output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", script_name)
+output_dir = os.path.join(
+    os.path.dirname(__file__), "..", "src", "outputs", script_name
+)
 os.makedirs(output_dir, exist_ok=True)
 
 # create timestamped output path
