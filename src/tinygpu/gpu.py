@@ -166,3 +166,35 @@ class TinyGPU:
             if not self.active.any():
                 break
             self.step()
+
+    def load_kernel(self, program, labels=None, grid=(1, None), args=None, shared_size=0):
+        """
+        Load a kernel program and configure grid/thread mapping.
+
+        - program, labels: assembled program (list, dict) (same as load_program)
+        - grid: (num_blocks, threads_per_block). threads_per_block None -> keep current
+        - args: list of scalar kernel arguments. These will be written into registers R0..Rk for ALL threads.
+        - shared_size: allocate per-block shared memory size (optional)
+        """
+        num_blocks, tpb = grid
+        if tpb is None:
+            tpb = self.threads_per_block if hasattr(self, "threads_per_block") else (self.num_threads // num_blocks)
+        # configure grid (this may resize internal thread arrays if total differs)
+        self.set_grid(int(num_blocks), int(tpb), shared_size=int(shared_size))
+
+        # set kernel args into registers R0..Rk for every thread (if provided)
+        if args:
+            for tid in range(self.num_threads):
+                for i, val in enumerate(args):
+                    # write into register i (R0, R1, ...)
+                    if i < self.num_registers:
+                        self.registers[tid, i] = int(val)
+
+        # finally load program and reset pcs/history
+        self.load_program(program, labels)
+
+    def run_kernel(self, max_cycles=1000):
+        """
+        Convenience wrapper: run until completion or max_cycles.
+        """
+        self.run(max_cycles=max_cycles)

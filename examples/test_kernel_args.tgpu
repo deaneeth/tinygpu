@@ -1,0 +1,6 @@
+; test_kernel_args.tgpu
+; R0 = arg0, R1 = arg1
+; Each thread writes R0 + R1 + tid into mem[tid]
+ADD R2, R0, R1
+ADD R2, R2, R7
+ST R7, R2
