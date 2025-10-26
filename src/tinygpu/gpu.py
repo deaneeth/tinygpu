@@ -1,151 +1,168 @@
+# src/tinygpu/gpu.py
 import numpy as np
 from .instructions import INSTRUCTIONS
 
-
-# TinyGPU core class definition
 class TinyGPU:
     def __init__(self, num_threads=8, num_registers=8, mem_size=256):
+        # core sizes
         self.num_threads = num_threads
         self.num_registers = num_registers
         self.mem_size = mem_size
 
-        # registers[tid, reg]
+        # registers and memory
         self.registers = np.zeros((num_threads, num_registers), dtype=np.int32)
-
-        # shared memory
         self.memory = np.zeros(mem_size, dtype=np.int32)
 
-        # per-thread program counter
+        # per-thread PC, active mask
         self.pc = np.zeros(num_threads, dtype=np.int32)
-
-        # per-thread "active" flag (unused lanes when needed)
         self.active = np.ones(num_threads, dtype=bool)
 
-        # barrier / sync state: per-thread whether it's waiting at a sync point
+        # flags from earlier enhancement (int8 bitmask)
+        self.flags = np.zeros(num_threads, dtype=np.int8)
+
+        # global sync waiting (already used for SYNC)
         self.sync_waiting = np.zeros(num_threads, dtype=bool)
 
-        # histories for visualization
-        self.history_registers = []  # list of arrays shape=(num_threads, num_registers)
-        self.history_memory = []  # list of arrays shape=(mem_size,)
-        self.history_pc = []  # list of pc array shape=(num_threads,)
-        self.history_flags = []  # list of flags array shape=(num_threads,) 
-        
-        # per-thread flags stored as an int8 bitmask:
-        # bit 0: Z (zero)   -> 1 if last compare was equal
-        # bit 1: N (negative)-> 1 if last compare was less (a < b)
-        # bit 2: G (greater) -> 1 if last compare was greater (a > b)
-        self.flags = np.zeros(num_threads, dtype=np.int8)
+        # block-level sync waiting (SYNCB)
+        self.sync_waiting_block = np.zeros(num_threads, dtype=bool)
+
+        # grid / shared memory defaults (1 block covering all threads)
+        self.num_blocks = 1
+        self.threads_per_block = num_threads
+        self.shared_size = 0
+        self.shared = np.zeros((1, 0), dtype=np.int32)  # shape (num_blocks, shared_size)
+
+        # history for visualization
+        self.history_registers = []
+        self.history_memory = []
+        self.history_pc = []
+        self.history_flags = []
+        self.history_shared = []  # for debugging/visualization of shared memory
 
         self.program = []
         self.labels = {}
 
-        # initialize thread ids in a fixed register (R7 by convention)
+        # initialize thread id in R7 and block/thread info in R5/R6 if possible
         for tid in range(self.num_threads):
-            # make sure register index exists
             if self.num_registers > 7:
-                self.registers[tid, 7] = tid
+                self.registers[tid, 7] = tid  # global thread id
             else:
-                # if too few registers, set R0 as thread id (unlikely), but warn
                 self.registers[tid, 0] = tid
+
+    def set_grid(self, num_blocks: int, threads_per_block: int, shared_size: int = 0):
+        """
+        Configure grid parameters and allocate shared memory.
+        Must call before running (or call before load_program/run).
+        """
+        self.num_blocks = int(num_blocks)
+        self.threads_per_block = int(threads_per_block)
+        self.shared_size = int(shared_size)
+
+        total_threads = self.num_blocks * self.threads_per_block
+        if total_threads != self.num_threads:
+            # resize register and pc arrays to match requested total threads
+            old_regs = self.registers.copy()
+            old_num_threads = self.num_threads
+            self.num_threads = total_threads
+            self.registers = np.zeros((self.num_threads, self.num_registers), dtype=np.int32)
+            # copy what fits
+            min_threads = min(old_num_threads, self.num_threads)
+            self.registers[:min_threads, :old_regs.shape[1]] = old_regs[:min_threads, :]
+
+            self.pc = np.zeros(self.num_threads, dtype=np.int32)
+            self.active = np.ones(self.num_threads, dtype=bool)
+            self.flags = np.zeros(self.num_threads, dtype=np.int8)
+            self.sync_waiting = np.zeros(self.num_threads, dtype=bool)
+            self.sync_waiting_block = np.zeros(self.num_threads, dtype=bool)
+
+        # allocate shared memory
+        self.shared = np.zeros((self.num_blocks, self.shared_size), dtype=np.int32)
+
+        # initialize block_id (R5) and thread_in_block (R6) registers for each thread if available
+        for tid in range(self.num_threads):
+            block_id = tid // self.threads_per_block
+            thread_in_block = tid % self.threads_per_block
+            if self.num_registers > 5:
+                self.registers[tid, 5] = block_id
+            if self.num_registers > 6:
+                self.registers[tid, 6] = thread_in_block
+            # keep R7 as global tid (already set in __init__)
 
     def load_program(self, program, labels=None):
         self.program = program
         self.labels = labels or {}
         self.pc[:] = 0
         self.sync_waiting[:] = False
+        self.sync_waiting_block[:] = False
         self.active[:] = True
         self.history_registers = []
         self.history_memory = []
         self.history_pc = []
+        self.history_flags = []
+        self.history_shared = []
 
     def step(self):
         """
-        Execute one cycle: each active thread executes the instruction at its PC.
-        Instructions that modify PC are expected to set self.pc[tid] inside the
-        instruction. If an instruction doesn't change PC, we increment it by 1
-        automatically. SYNC instructions should set sync_waiting[tid] = True and then
-        the core will release them when all threads have reached the same sync point
-        (or simple condition).
+        Execute one cycle: each active thread executes one instruction at its PC.
+        Interactions:
+          - SYNC (global) uses sync_waiting
+          - SYNCB (block) uses sync_waiting_block (released per-block)
         """
-        self._execute_threads()
-        self._handle_global_barrier()
-        self._record_state()
+        for tid in range(self.num_threads):
+            if not self.active[tid]:
+                continue
+            if self.pc[tid] < 0 or self.pc[tid] >= len(self.program):
+                self.active[tid] = False
+                continue
+
+            instr, args = self.program[self.pc[tid]]
+            func = INSTRUCTIONS.get(instr)
+            before_pc = int(self.pc[tid])
+
+            if func:
+                func(self, tid, *args)
+
+                # if instruction didn't change PC (and not waiting), increment
+                if int(self.pc[tid]) == before_pc and not self.sync_waiting[tid] and not self.sync_waiting_block[tid]:
+                    self.pc[tid] = before_pc + 1
+
+        # handle global barrier release (existing behavior)
+        if self.sync_waiting.any():
+            active_waiting = self.sync_waiting[self.active]
+            if active_waiting.size > 0 and active_waiting.all():
+                for tid in range(self.num_threads):
+                    if self.active[tid] and self.sync_waiting[tid]:
+                        self.pc[tid] = int(self.pc[tid]) + 1
+                        self.sync_waiting[tid] = False
+
+        # handle block-level barriers
+        if self.sync_waiting_block.any():
+            # check each block independently
+            for b in range(self.num_blocks):
+                # find tids in this block
+                start = b * self.threads_per_block
+                end = start + self.threads_per_block
+                block_active_mask = self.active[start:end]
+                if not block_active_mask.any():
+                    continue
+                block_waiting = self.sync_waiting_block[start:end][block_active_mask]
+                # if all active threads in block are waiting, release them
+                if block_waiting.size > 0 and block_waiting.all():
+                    # advance pc for waiting threads in this block
+                    for tid in range(start, end):
+                        if self.active[tid] and self.sync_waiting_block[tid]:
+                            self.pc[tid] = int(self.pc[tid]) + 1
+                            self.sync_waiting_block[tid] = False
+
+        # record history
         self.history_registers.append(self.registers.copy())
         self.history_memory.append(self.memory.copy())
         self.history_pc.append(self.pc.copy())
         self.history_flags.append(self.flags.copy())
-
-
-    def _execute_threads(self):
-        for tid in range(self.num_threads):
-            if not self.active[tid]:
-                continue
-            if self.pc[tid] < 0 or self.pc[tid] >= len(self.program):
-                self.active[tid] = False
-                continue
-            instr, args = self.program[self.pc[tid]]
-            func = INSTRUCTIONS.get(instr)
-            before_pc = int(self.pc[tid])
-            if func:
-                func(self, tid, *args)
-                if int(self.pc[tid]) == before_pc and not self.sync_waiting[tid]:
-                    self.pc[tid] = before_pc + 1
-
-    def _handle_global_barrier(self):
-        if self.sync_waiting.any():
-            active_waiting = self.sync_waiting[self.active]
-            if active_waiting.size > 0 and active_waiting.all():
-                for tid in range(self.num_threads):
-                    if self.active[tid] and self.sync_waiting[tid]:
-                        self.pc[tid] = int(self.pc[tid]) + 1
-                        self.sync_waiting[tid] = False
-
-    def _record_state(self):
-        self.history_registers.append(self.registers.copy())
-        self.history_memory.append(self.memory.copy())
-        self.history_pc.append(self.pc.copy())
-        # Loop threads and execute their instruction if active and in-range
-        for tid in range(self.num_threads):
-            if not self.active[tid]:
-                continue
-            if self.pc[tid] < 0 or self.pc[tid] >= len(self.program):
-                # thread finished
-                self.active[tid] = False
-                continue
-
-            instr, args = self.program[self.pc[tid]]
-            func = INSTRUCTIONS.get(instr)
-            before_pc = int(self.pc[tid])
-
-            if func:
-                # execute instruction
-                func(self, tid, *args)
-
-                # If instruction didn't change PC (still same before_pc), increment
-                if int(self.pc[tid]) == before_pc and not self.sync_waiting[tid]:
-                    # increment to next instruction
-                    self.pc[tid] = before_pc + 1
-
-        # handle global barrier:
-        # if any thread is waiting at a sync point, check if we can release
-        if self.sync_waiting.any():
-            # crude policy: release when all active threads have sync_waiting True
-            # only consider threads that are still active
-            active_waiting = self.sync_waiting[self.active]
-            if active_waiting.size > 0 and active_waiting.all():
-                # move all waiting threads forward by 1 and clear waiting flags
-                for tid in range(self.num_threads):
-                    if self.active[tid] and self.sync_waiting[tid]:
-                        self.pc[tid] = int(self.pc[tid]) + 1
-                        self.sync_waiting[tid] = False
-
-        # record state
-        self.history_registers.append(self.registers.copy())
-        self.history_memory.append(self.memory.copy())
-        self.history_pc.append(self.pc.copy())
+        self.history_shared.append(self.shared.copy())
 
     def run(self, max_cycles=1000):
-        for _cycle in range(max_cycles):
+        for cycle in range(max_cycles):
             if not self.active.any():
                 break
             self.step()
