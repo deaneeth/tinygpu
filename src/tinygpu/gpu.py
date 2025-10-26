@@ -28,6 +28,13 @@ class TinyGPU:
         self.history_registers = []  # list of arrays shape=(num_threads, num_registers)
         self.history_memory = []  # list of arrays shape=(mem_size,)
         self.history_pc = []  # list of pc array shape=(num_threads,)
+        self.history_flags = []  # list of flags array shape=(num_threads,) 
+        
+        # per-thread flags stored as an int8 bitmask:
+        # bit 0: Z (zero)   -> 1 if last compare was equal
+        # bit 1: N (negative)-> 1 if last compare was less (a < b)
+        # bit 2: G (greater) -> 1 if last compare was greater (a > b)
+        self.flags = np.zeros(num_threads, dtype=np.int8)
 
         self.program = []
         self.labels = {}
@@ -63,6 +70,11 @@ class TinyGPU:
         self._execute_threads()
         self._handle_global_barrier()
         self._record_state()
+        self.history_registers.append(self.registers.copy())
+        self.history_memory.append(self.memory.copy())
+        self.history_pc.append(self.pc.copy())
+        self.history_flags.append(self.flags.copy())
+
 
     def _execute_threads(self):
         for tid in range(self.num_threads):
