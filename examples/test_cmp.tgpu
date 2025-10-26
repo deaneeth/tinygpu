@@ -1,0 +1,18 @@
+; test_cmp.tgpu
+; Thread-local compare test -- each thread compares R7 (tid) with an immediate and sets R0
+
+SET R0, 0         ; default result
+SET R1, 5         ; threshold 5
+CMP R7, R1        ; compare tid vs 5
+BRGT greater
+BRZ equal
+; tid < 5
+SET R0, 1
+JMP done
+equal:
+SET R0, 2
+JMP done
+greater:
+SET R0, 3
+done:
+; end
