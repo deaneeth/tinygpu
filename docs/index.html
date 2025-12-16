@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TinyGPU: Building a GPU Simulator in Python</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+            colors: {
+              slate: {
+                850: "#1e293b", // Custom dark shade
+                950: "#020617", // Darker background
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
+
+      body {
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      .chart-container {
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+        height: 400px;
+        max-height: 400px;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #0f172a;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 4px;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      .step-active {
+        border-left: 4px solid #6366f1; /* Indigo-500 */
+        background-color: #e0e7ff; /* Indigo-100 */
+      }
+      .dark .step-active {
+        border-left: 4px solid #818cf8; /* Indigo-400 */
+        background-color: #1e1b4b; /* Indigo-950 */
+      }
+
+      /* Loading Animation */
+      .typing-indicator span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background-color: currentColor;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out both;
+        margin-right: 3px;
+      }
+      .typing-indicator span:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      .typing-indicator span:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes typing {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+
+      /* Glassmorphism utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      .dark .glass {
+        background: rgba(15, 23, 42, 0.7); /* Slate-900 with opacity */
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+    </style>
+  </head>
+  <body
+    class="antialiased bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 selection:bg-indigo-500 selection:text-white"
+  >
+    <!-- Navigation -->
+    <nav
+      class="sticky top-0 z-50 glass border-b border-slate-200 dark:border-slate-800 transition-colors duration-300"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+          <div class="flex items-center gap-3">
+            <div
+              class="bg-indigo-600 dark:bg-indigo-500 text-white p-1.5 rounded-lg"
+            >
+              <i class="fas fa-microchip text-lg"></i>
+            </div>
+            <span
+              class="font-mono font-bold text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400"
+              >TinyGPU</span
+            >
+          </div>
+
+          <!-- Desktop Nav -->
+          <div
+            class="hidden md:flex items-center space-x-6 text-sm font-medium"
+          >
+            <a
+              href="#problem"
+              class="text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+              >The Problem</a
+            >
+            <a
+              href="#architecture"
+              class="text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+              >Architecture</a
+            >
+            <a
+              href="#ai-architect"
+              class="text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors flex items-center gap-1"
+              >AI Architect
+              <i class="fas fa-sparkles text-yellow-500 text-xs"></i
+            ></a>
+            <a
+              href="#simulation"
+              class="text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+              >Live Demo</a
+            >
+
+            <div class="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-2"></div>
+
+            <button
+              id="theme-toggle"
+              class="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-label="Toggle Dark Mode"
+            >
+              <i class="fas fa-moon dark:hidden"></i>
+              <i class="fas fa-sun hidden dark:block"></i>
+            </button>
+
+            <button
+              onclick="document.getElementById('simulation').scrollIntoView({behavior: 'smooth'})"
+              class="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-indigo-500/30 transition-all transform hover:scale-105 active:scale-95"
+            >
+              Run Demo
+            </button>
+          </div>
+
+          <!-- Mobile menu button (Simplified for this file) -->
+          <div class="md:hidden flex items-center gap-4">
+            <button
+              id="theme-toggle-mobile"
+              class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              <i class="fas fa-moon dark:hidden"></i>
+              <i class="fas fa-sun hidden dark:block"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header
+      class="relative overflow-hidden bg-slate-900 dark:bg-slate-950 text-white py-24 md:py-32"
+    >
+      <!-- Abstract Background -->
+      <div
+        class="absolute inset-0 opacity-20 dark:opacity-10 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:24px_24px]"
+      ></div>
+      <div
+        class="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"
+      ></div>
+      <div
+        class="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"
+      ></div>
+
+      <div class="relative max-w-5xl mx-auto px-6 text-center z-10">
+        <div
+          class="inline-block mb-4 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700 text-indigo-400 text-sm font-semibold tracking-wide backdrop-blur-sm"
+        >
+          PROJECT RETROSPECTIVE
+        </div>
+        <h1
+          class="text-4xl md:text-6xl font-extrabold mb-6 leading-tight tracking-tight"
+        >
+          I Built a GPU Simulator <br class="hidden md:block" />
+          <span
+            class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400"
+            >from Scratch in Python</span
+          >
+        </h1>
+        <p
+          class="text-xl md:text-2xl text-slate-400 mb-10 max-w-2xl mx-auto font-light leading-relaxed"
+        >
+          Moving from the opaque "black box" of parallel debugging to a
+          transparent, observable mental model.
+        </p>
+
+        <div class="flex justify-center items-center gap-8 md:gap-16 mt-12">
+          <div class="flex flex-col items-center group">
+            <span
+              class="text-4xl md:text-5xl font-bold text-white group-hover:text-indigo-400 transition-colors"
+              >512</span
+            >
+            <span
+              class="text-xs text-slate-500 uppercase tracking-widest mt-2 font-semibold"
+              >Threads</span
+            >
+          </div>
+          <div
+            class="h-12 w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent"
+          ></div>
+          <div class="flex flex-col items-center group">
+            <span
+              class="text-4xl md:text-5xl font-bold text-indigo-400 group-hover:scale-110 transition-transform duration-300"
+              >1</span
+            >
+            <span
+              class="text-xs text-slate-500 uppercase tracking-widest mt-2 font-semibold"
+              >Visualizer</span
+            >
+          </div>
+          <div
+            class="h-12 w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent"
+          ></div>
+          <div class="flex flex-col items-center group">
+            <span
+              class="text-4xl md:text-5xl font-bold text-white group-hover:text-purple-400 transition-colors"
+              >0</span
+            >
+            <span
+              class="text-xs text-slate-500 uppercase tracking-widest mt-2 font-semibold"
+              >Hardware</span
+            >
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- The Problem Section -->
+    <section
+      id="problem"
+      class="py-24 bg-white dark:bg-slate-900 transition-colors duration-300"
+    >
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="grid md:grid-cols-2 gap-16 items-center">
+          <div>
+            <h2
+              class="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-sm mb-3"
+            >
+              The Motivation
+            </h2>
+            <h3
+              class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-6 leading-tight"
+            >
+              The Headache of <br />Parallel Debugging
+            </h3>
+            <p
+              class="text-lg text-slate-600 dark:text-slate-300 mb-6 leading-relaxed"
+            >
+              There is a specific kind of pain when debugging parallel code. You
+              launch 512 threads, and... silence. Or a race condition that
+              happens once every thousand runs.
+            </p>
+            <p
+              class="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed"
+            >
+              I realized I didn't actually understand how a GPU
+              <em>schedules</em> work. I knew the theory—SIMT, warps,
+              barriers—but I couldn't <strong>see</strong> it.
+            </p>
+            <div
+              class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-6 rounded-r-xl"
+            >
+              <p
+                class="text-amber-800 dark:text-amber-200 font-medium italic text-lg"
+              >
+                "If the entire state of the GPU is just a set of NumPy arrays,
+                then the state is plottable."
+              </p>
+            </div>
+          </div>
+
+          <!-- Visual Card -->
+          <div class="relative group">
+            <div
+              class="absolute -inset-1 bg-gradient-to-r from-red-500 to-indigo-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"
+            ></div>
+            <div
+              class="relative bg-slate-50 dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden"
+            >
+              <!-- Top: Problem -->
+              <div class="mb-8 relative z-10">
+                <h4
+                  class="font-mono font-bold text-slate-800 dark:text-slate-100 mb-4 flex justify-between items-center"
+                >
+                  <span>Current Reality</span>
+                  <i class="fas fa-bug text-red-500 animate-pulse"></i>
+                </h4>
+                <div
+                  class="font-mono text-xs text-slate-500 dark:text-slate-400 space-y-2 bg-slate-100 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50"
+                >
+                  <p class="text-red-600 dark:text-red-400">
+                    > Segfault: Thread 42 out of bounds
+                  </p>
+                  <p>> Memory Access Violation (Address 0x004F)</p>
+                  <p class="opacity-50">> ... (Opaque hardware state)</p>
+                </div>
+              </div>
+
+              <div
+                class="w-full h-px bg-slate-200 dark:bg-slate-700 my-8"
+              ></div>
+
+              <!-- Bottom: Solution -->
+              <div class="relative z-10">
+                <h4
+                  class="font-mono font-bold text-slate-800 dark:text-slate-100 mb-4 flex justify-between items-center"
+                >
+                  <span>The Goal (TinyGPU)</span>
+                  <i class="fas fa-eye text-indigo-500"></i>
+                </h4>
+                <div
+                  class="grid grid-cols-8 gap-1 h-20 w-full opacity-50 group-hover:opacity-100 transition-opacity duration-500"
+                >
+                  <!-- Simulated Heatmap Grid using JS logic style blocks -->
+                  <div class="bg-indigo-200 dark:bg-indigo-900"></div>
+                  <div class="bg-indigo-300 dark:bg-indigo-800"></div>
+                  <div class="bg-indigo-400 dark:bg-indigo-700"></div>
+                  <div class="bg-indigo-500 dark:bg-indigo-600"></div>
+                  <div class="bg-indigo-600 dark:bg-indigo-500"></div>
+                  <div class="bg-indigo-500 dark:bg-indigo-600"></div>
+                  <div class="bg-indigo-400 dark:bg-indigo-700"></div>
+                  <div class="bg-indigo-300 dark:bg-indigo-800"></div>
+                  <div class="bg-indigo-200 dark:bg-indigo-900"></div>
+                  <div class="bg-indigo-100 dark:bg-indigo-950"></div>
+                  <div class="bg-indigo-200 dark:bg-indigo-900"></div>
+                  <div class="bg-indigo-300 dark:bg-indigo-800"></div>
+                  <div class="bg-indigo-400 dark:bg-indigo-700"></div>
+                  <div class="bg-indigo-500 dark:bg-indigo-600"></div>
+                  <div class="bg-indigo-600 dark:bg-indigo-500"></div>
+                  <div class="bg-indigo-700 dark:bg-indigo-400"></div>
+                </div>
+                <p
+                  class="text-center text-xs text-slate-400 mt-3 font-medium tracking-wide"
+                >
+                  Visualizing memory hotspots in real-time
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section
+      id="architecture"
+      class="py-24 bg-slate-50 dark:bg-slate-950 border-y border-slate-200 dark:border-slate-800 transition-colors duration-300"
+    >
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-16">
+          <h2
+            class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white"
+          >
+            The "Glass Box" Architecture
+          </h2>
+          <p
+            class="text-slate-600 dark:text-slate-400 mt-4 max-w-2xl mx-auto text-lg"
+          >
+            TinyGPU is designed to be fully observable. Click on the components
+            below to understand how the system transforms code into visual
+            insight.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8 mb-12">
+          <!-- Assembler Card -->
+          <div
+            class="group bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all transform hover:-translate-y-1"
+            onclick="updateArchDetail('assembler')"
+          >
+            <div
+              class="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform"
+            >
+              <i class="fas fa-code text-2xl"></i>
+            </div>
+            <h3 class="font-bold text-xl mb-3 text-slate-900 dark:text-white">
+              1. The Assembler
+            </h3>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              Parses <code>.tgpu</code> assembly files. Converts human-readable
+              text into numeric instructions.
+            </p>
+          </div>
+
+          <!-- Core Card -->
+          <div
+            class="group bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/50 cursor-pointer hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all transform hover:-translate-y-1"
+            onclick="updateArchDetail('core')"
+          >
+            <div
+              class="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center mb-6 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform"
+            >
+              <i class="fas fa-cogs text-2xl"></i>
+            </div>
+            <h3 class="font-bold text-xl mb-3 text-slate-900 dark:text-white">
+              2. The Core (TinyGPU)
+            </h3>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              The heavy lifter. Uses NumPy for vectorized state (Registers,
+              Memory, PC). Handles SIMT logic.
+            </p>
+          </div>
+
+          <!-- Visualizer Card -->
+          <div
+            class="group bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all transform hover:-translate-y-1"
+            onclick="updateArchDetail('visualizer')"
+          >
+            <div
+              class="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-6 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform"
+            >
+              <i class="fas fa-film text-2xl"></i>
+            </div>
+            <h3 class="font-bold text-xl mb-3 text-slate-900 dark:text-white">
+              3. The Visualizer
+            </h3>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              The "Flight Recorder". Replays the execution history as a
+              frame-by-frame heatmap GIF.
+            </p>
+          </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div
+          id="arch-detail"
+          class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 md:p-10 shadow-lg transition-all duration-300"
+        >
+          <h4
+            id="detail-title"
+            class="text-2xl font-bold text-indigo-900 dark:text-indigo-300 mb-6"
+          >
+            The Core (TinyGPU)
+          </h4>
+          <div class="grid md:grid-cols-2 gap-10">
+            <div>
+              <p
+                id="detail-desc"
+                class="text-slate-600 dark:text-slate-300 mb-6 leading-relaxed text-lg"
+              >
+                Instead of creating a Python object for every thread (which is
+                slow), TinyGPU uses NumPy for everything. The registers are a
+                single 2D array:
+                <code
+                  >self.registers = np.zeros((num_threads, num_registers))</code
+                >. This mimics the SIMD nature of real hardware.
+              </p>
+              <ul
+                id="detail-list"
+                class="space-y-3 text-sm text-slate-500 dark:text-slate-400 font-medium"
+              >
+                <li class="flex items-center">
+                  <i class="fas fa-check-circle text-green-500 mr-3"></i> Stores
+                  'PC', 'Registers', 'Memory', 'Flags'
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check-circle text-green-500 mr-3"></i> Runs
+                  the step() cycle
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                  Manages the 'Active Mask' for branching
+                </li>
+              </ul>
+            </div>
+            <div
+              class="bg-slate-900 dark:bg-black rounded-xl p-6 font-mono text-xs md:text-sm text-green-400 overflow-x-auto shadow-inner border border-slate-700"
+            >
+              <div class="flex gap-2 mb-3">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <pre id="detail-code">
+class TinyGPU:
+    def __init__(self, num_threads, memory_size):
+        self.memory = np.zeros(memory_size)
+        self.registers = np.zeros((num_threads, 8))
+        self.pc = np.zeros(num_threads, dtype=int)
+        self.active = np.ones(num_threads, dtype=bool)</pre
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Assembly Architect Section -->
+    <section
+      id="ai-architect"
+      class="py-24 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors duration-300"
+    >
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-12">
+          <div
+            class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4"
+          >
+            <i class="fas fa-sparkles"></i> Powered by Gemini
+          </div>
+          <h2
+            class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white"
+          >
+            AI Assembly Architect
+          </h2>
+          <p
+            class="text-slate-600 dark:text-slate-400 mt-4 max-w-2xl mx-auto text-lg"
+          >
+            Writing assembly is hard. Describe a parallel algorithm logic below,
+            and the AI will generate the <code>.tgpu</code> assembly code using
+            the TinyGPU instruction set.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8 items-stretch">
+          <!-- Input Panel -->
+          <div
+            class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full"
+          >
+            <label
+              class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex justify-between"
+            >
+              <span>Describe Kernel Logic</span>
+              <span class="text-xs font-normal text-slate-400"
+                >Natural Language</span
+              >
+            </label>
+            <textarea
+              id="assembly-prompt"
+              class="w-full h-48 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none mb-6 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600"
+              placeholder="E.g., Load value from memory address in R1, add 5 to it, and store it back if the value is greater than 10. Include a barrier synchronization."
+            ></textarea>
+
+            <button
+              id="btn-gen-assembly"
+              class="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 transform active:scale-95"
+            >
+              <i class="fas fa-magic"></i> Generate Code
+            </button>
+          </div>
+
+          <!-- Output Panel -->
+          <div
+            class="bg-slate-900 dark:bg-black p-8 rounded-2xl shadow-inner border border-slate-700 relative overflow-hidden flex flex-col h-[400px]"
+          >
+            <div
+              class="absolute top-0 right-0 p-6 opacity-10 pointer-events-none"
+            >
+              <i class="fas fa-microchip text-white text-8xl"></i>
+            </div>
+
+            <div
+              class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4"
+            >
+              <h4
+                class="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+              >
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                Generated Output (.tgpu)
+              </h4>
+              <span
+                id="ai-loading"
+                class="hidden text-indigo-400 text-xs typing-indicator"
+              >
+                <span></span><span></span><span></span>
+              </span>
+            </div>
+
+            <pre
+              id="assembly-output"
+              class="font-mono text-green-400 text-xs md:text-sm overflow-y-auto whitespace-pre-wrap flex-1 scrollbar-thin scrollbar-thumb-slate-700 pr-2"
+            >
+Waiting for input...</pre
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Simulation Section (The "Demo") -->
+    <section
+      id="simulation"
+      class="py-24 bg-white dark:bg-slate-950 transition-colors duration-300"
+    >
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="grid lg:grid-cols-12 gap-12">
+          <!-- Controls & Context (4 cols) -->
+          <div class="lg:col-span-4">
+            <h2 class="text-3xl font-bold text-slate-900 dark:text-white mb-6">
+              Visualizing the <br class="hidden lg:block" />"Heartbeat"
+            </h2>
+            <p
+              id="sim-description"
+              class="text-slate-600 dark:text-slate-400 mb-6 text-lg"
+            >
+              This interactive demo recreates the report's
+              <strong>Odd-Even Transposition Sort</strong> example.
+            </p>
+            <p
+              id="sim-details"
+              class="text-sm text-slate-500 dark:text-slate-500 mb-8 leading-relaxed"
+            >
+              The Bar Chart represents <strong>Global Memory</strong>. Each bar
+              is a value. In a parallel sort, adjacent pairs are compared and
+              swapped simultaneously.
+            </p>
+
+            <div
+              class="bg-slate-50 dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm"
+            >
+              <h4
+                class="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2"
+              >
+                <i class="fas fa-sliders-h text-indigo-500"></i> Controls
+              </h4>
+
+              <div class="mb-6">
+                <label
+                  class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2"
+                  >Select Kernel</label
+                >
+                <div class="relative">
+                  <select
+                    id="algo-select"
+                    class="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-3 appearance-none cursor-pointer"
+                  >
+                    <option value="sort">Odd-Even Sort</option>
+                    <option value="reduction">Parallel Reduction</option>
+                    <option value="blocksum">Block Shared Sum</option>
+                    <option value="vectoradd">Vector Addition</option>
+                  </select>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 dark:text-slate-300"
+                  >
+                    <i class="fas fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <button
+                  id="btn-step"
+                  class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-semibold py-3 px-4 border border-slate-200 dark:border-slate-600 rounded-xl shadow-sm transition-all text-sm flex items-center justify-center gap-2"
+                >
+                  <i class="fas fa-step-forward"></i> Step
+                </button>
+                <button
+                  id="btn-reset"
+                  class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-semibold py-3 px-4 rounded-xl shadow-sm transition-all text-sm flex items-center justify-center gap-2"
+                >
+                  <i class="fas fa-undo"></i> Reset
+                </button>
+              </div>
+              <button
+                id="btn-play"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+              >
+                <i class="fas fa-play"></i> Auto Run
+              </button>
+
+              <div
+                class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700"
+              >
+                <div class="flex justify-between items-center text-sm mb-3">
+                  <span class="text-slate-500 dark:text-slate-400">Phase:</span>
+                  <span
+                    id="sort-phase"
+                    class="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/50 px-2 py-1 rounded"
+                    >IDLE</span
+                  >
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-slate-500 dark:text-slate-400">Ops:</span>
+                  <span
+                    id="sort-comparisons"
+                    class="font-mono font-bold text-slate-900 dark:text-white"
+                    >0</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visualization Area (8 cols) -->
+          <div class="lg:col-span-8">
+            <div
+              class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-6 h-full flex flex-col"
+            >
+              <div class="flex justify-between items-center mb-6">
+                <h3 class="font-bold text-slate-800 dark:text-white text-lg">
+                  Global Memory
+                </h3>
+                <div
+                  class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full"
+                >
+                  <span
+                    class="w-2 h-2 bg-indigo-500 rounded-full inline-block"
+                  ></span>
+                  Value Magnitude
+                </div>
+              </div>
+
+              <!-- Chart Container (Mandatory Style) -->
+              <div class="chart-container flex-grow">
+                <canvas id="memoryChart"></canvas>
+              </div>
+
+              <!-- Active Mask Visualization -->
+              <div
+                class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50"
+              >
+                <div class="flex justify-between items-end mb-3">
+                  <p
+                    class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"
+                  >
+                    Active Thread Mask
+                  </p>
+                  <span class="text-[10px] text-slate-400"
+                    >Green = Executing</span
+                  >
+                </div>
+                <div
+                  id="thread-mask"
+                  class="flex w-full gap-0.5 h-6 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1"
+                >
+                  <!-- JS will populate this -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The Build: Deep Dives -->
+    <section
+      id="insights"
+      class="py-24 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors duration-300"
+    >
+      <div class="max-w-6xl mx-auto px-6">
+        <h2
+          class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white text-center mb-16"
+        >
+          Key Engineering Insights
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-8">
+          <!-- Insight 1: Vectorization -->
+          <div
+            class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden group"
+          >
+            <div
+              class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"
+            >
+              <i class="fas fa-layer-group text-8xl text-indigo-500"></i>
+            </div>
+
+            <div class="flex items-center justify-between mb-6 relative z-10">
+              <div class="flex items-center gap-4">
+                <div
+                  class="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-xl"
+                >
+                  <i class="fas fa-layer-group text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">
+                  Vectorized State
+                </h3>
+              </div>
+              <button
+                onclick="explainConcept('Vectorization in GPU simulation')"
+                class="text-xs bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-700/50 transition-colors flex items-center gap-1 font-semibold"
+              >
+                <i
+                  class="fas fa-sparkles text-indigo-500 dark:text-indigo-400"
+                ></i>
+                AI Explain
+              </button>
+            </div>
+            <p
+              class="text-slate-600 dark:text-slate-300 mb-4 font-medium text-lg leading-relaxed"
+            >
+              The Insight: A GPU is just a state machine. If state is data, it
+              can be vectorized.
+            </p>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              Instead of looping 512 times in Python (slow), TinyGPU uses NumPy
+              slicing. <code>ADD R0, R1, R2</code> becomes a single array
+              operation: <code>regs[:,0] = regs[:,1] + regs[:,2]</code>. This
+              aligns Python's strengths (C-backed arrays) with the GPU's nature
+              (SIMD).
+            </p>
+          </div>
+
+          <!-- Insight 2: Divergence -->
+          <div
+            class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden group"
+          >
+            <div
+              class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"
+            >
+              <i class="fas fa-code-branch text-8xl text-amber-500"></i>
+            </div>
+            <div class="flex items-center justify-between mb-6 relative z-10">
+              <div class="flex items-center gap-4">
+                <div
+                  class="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl"
+                >
+                  <i class="fas fa-code-branch text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">
+                  The Active Mask
+                </h3>
+              </div>
+              <button
+                onclick="explainConcept('GPU Branch Divergence and Execution Masks')"
+                class="text-xs bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-700/50 transition-colors flex items-center gap-1 font-semibold"
+              >
+                <i
+                  class="fas fa-sparkles text-indigo-500 dark:text-indigo-400"
+                ></i>
+                AI Explain
+              </button>
+            </div>
+            <p
+              class="text-slate-600 dark:text-slate-300 mb-4 font-medium text-lg leading-relaxed"
+            >
+              The Challenge: What happens when Thread 0 takes the
+              <code>if</code> and Thread 1 takes the <code>else</code>?
+            </p>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              Real GPUs use an execution mask. In TinyGPU, I implemented
+              <code>self.active</code>, a boolean array. Instructions only
+              update state where <code>active == True</code>. Threads that don't
+              take the branch execute "no-ops" until paths converge.
+            </p>
+          </div>
+
+          <!-- Insight 3: Sync -->
+          <div
+            class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden group"
+          >
+            <div
+              class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"
+            >
+              <i class="fas fa-stopwatch text-8xl text-red-500"></i>
+            </div>
+            <div class="flex items-center justify-between mb-6 relative z-10">
+              <div class="flex items-center gap-4">
+                <div
+                  class="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl"
+                >
+                  <i class="fas fa-stopwatch text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">
+                  Synchronization
+                </h3>
+              </div>
+              <button
+                onclick="explainConcept('Barrier Synchronization in Parallel Computing')"
+                class="text-xs bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-700/50 transition-colors flex items-center gap-1 font-semibold"
+              >
+                <i
+                  class="fas fa-sparkles text-indigo-500 dark:text-indigo-400"
+                ></i>
+                AI Explain
+              </button>
+            </div>
+            <p
+              class="text-slate-600 dark:text-slate-300 mb-4 font-medium text-lg leading-relaxed"
+            >
+              The Struggle: Implementing <code>SYNC</code> barriers in a serial
+              loop.
+            </p>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              I had to create a <code>sync_waiting</code> mask. Threads hit the
+              barrier, mark themselves waiting, and do nothing until
+              <code>all(active_threads)</code> are waiting. Debugging the
+              barrier logic itself was a meta-challenge.
+            </p>
+          </div>
+
+          <!-- Insight 4: Trade-offs -->
+          <div
+            class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden group"
+          >
+            <div class="flex items-center gap-4 mb-6">
+              <div
+                class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl"
+              >
+                <i class="fas fa-balance-scale text-xl"></i>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 dark:text-white">
+                Performance vs. Visibility
+              </h3>
+            </div>
+            <!-- Chart Container for Radar/Bar -->
+            <div class="chart-container !h-48 !max-h-48 mb-4">
+              <canvas id="tradeoffChart"></canvas>
+            </div>
+            <p
+              class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"
+            >
+              I sacrificed raw speed for "Observability". It runs thousands of
+              ops/sec, not billions. But this slowness allows the "Flight
+              Recorder" to capture every single state change for replay.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Explanation Modal (Updated Design) -->
+    <div
+      id="ai-modal"
+      class="fixed inset-0 z-[100] hidden overflow-y-auto"
+      aria-labelledby="modal-title"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0"
+      >
+        <div
+          class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm transition-opacity"
+          aria-hidden="true"
+          onclick="closeAiModal()"
+        ></div>
+
+        <span
+          class="hidden sm:inline-block sm:align-middle sm:h-screen"
+          aria-hidden="true"
+          >&#8203;</span
+        >
+
+        <div
+          class="inline-block align-bottom bg-white dark:bg-slate-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-slate-200 dark:border-slate-700"
+        >
+          <div class="bg-white dark:bg-slate-900 px-6 pt-8 pb-6">
+            <div class="sm:flex sm:items-start">
+              <div
+                class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 sm:mx-0 sm:h-10 sm:w-10 mb-4 sm:mb-0"
+              >
+                <i
+                  class="fas fa-robot text-indigo-600 dark:text-indigo-400"
+                ></i>
+              </div>
+              <div class="sm:ml-4 w-full text-center sm:text-left">
+                <h3
+                  class="text-lg leading-6 font-bold text-slate-900 dark:text-white"
+                  id="modal-title"
+                >
+                  AI Explanation <span class="text-indigo-500">✨</span>
+                </h3>
+                <div
+                  class="mt-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700"
+                >
+                  <p
+                    id="ai-modal-content"
+                    class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line min-h-[80px] flex items-center justify-center"
+                  >
+                    <span class="typing-indicator text-indigo-500"
+                      ><span></span><span></span><span></span
+                    ></span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 sm:flex sm:flex-row-reverse border-t border-slate-100 dark:border-slate-800"
+          >
+            <button
+              type="button"
+              class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-base font-medium text-white focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+              onclick="closeAiModal()"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conclusion & Roadmap -->
+    <section
+      class="py-24 bg-slate-900 dark:bg-slate-950 text-slate-300 border-t border-slate-800 transition-colors duration-300"
+    >
+      <div class="max-w-4xl mx-auto px-6 text-center">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-8">
+          Closing Reflection
+        </h2>
+        <p
+          class="text-xl md:text-2xl font-light mb-16 leading-relaxed max-w-3xl mx-auto"
+        >
+          "When you build a simulator, the magic dissolves. The GPU is no longer
+          a beast to be tamed; it’s just a machine looping over arrays."
+          <br /><br />
+          <span class="text-indigo-400 font-semibold"
+            >Observability is Feature #1.</span
+          >
+        </p>
+
+        <div class="grid md:grid-cols-3 gap-8 text-left mb-16">
+          <div
+            class="bg-slate-800 dark:bg-slate-900 p-8 rounded-2xl border border-slate-700 hover:border-slate-600 transition-colors"
+          >
+            <h4 class="text-indigo-400 font-bold mb-4 text-lg">What Works</h4>
+            <ul class="text-sm space-y-3 text-slate-400">
+              <li class="flex items-start">
+                <i class="fas fa-check text-indigo-500 mt-1 mr-2"></i> Visual
+                Intuition of barriers
+              </li>
+              <li class="flex items-start">
+                <i class="fas fa-check text-indigo-500 mt-1 mr-2"></i>
+                Deterministic Unit Testing
+              </li>
+              <li class="flex items-start">
+                <i class="fas fa-check text-indigo-500 mt-1 mr-2"></i> No Driver
+                Installation
+              </li>
+            </ul>
+          </div>
+          <div
+            class="bg-slate-800 dark:bg-slate-900 p-8 rounded-2xl border border-slate-700 hover:border-slate-600 transition-colors"
+          >
+            <h4 class="text-amber-400 font-bold mb-4 text-lg">Limitations</h4>
+            <ul class="text-sm space-y-3 text-slate-400">
+              <li class="flex items-start">
+                <i
+                  class="fas fa-exclamation-triangle text-amber-500 mt-1 mr-2"
+                ></i>
+                Pure Python speed (Slow)
+              </li>
+              <li class="flex items-start">
+                <i
+                  class="fas fa-exclamation-triangle text-amber-500 mt-1 mr-2"
+                ></i>
+                Simplified Cache Model
+              </li>
+              <li class="flex items-start">
+                <i
+                  class="fas fa-exclamation-triangle text-amber-500 mt-1 mr-2"
+                ></i>
+                Custom Toy ISA
+              </li>
+            </ul>
+          </div>
+          <div
+            class="bg-slate-800 dark:bg-slate-900 p-8 rounded-2xl border border-slate-700 hover:border-slate-600 transition-colors"
+          >
+            <h4 class="text-green-400 font-bold mb-4 text-lg">
+              Future Roadmap
+            </h4>
+            <ul class="text-sm space-y-3 text-slate-400">
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-green-500 mt-1 mr-2"></i> Warp
+                Divergence Viz
+              </li>
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-green-500 mt-1 mr-2"></i>
+                Python-to-TinyGPU Compiler
+              </li>
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-green-500 mt-1 mr-2"></i>
+                <strong>Web-Based UI (You are here)</strong>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <a
+          href="#"
+          class="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-full font-bold transition-all transform hover:-translate-y-1"
+        >
+          <i class="fab fa-github text-xl"></i> Check out the Repo
+        </a>
+      </div>
+    </section>
+
+    <footer
+      class="bg-slate-950 py-12 text-center text-slate-600 dark:text-slate-500 text-sm border-t border-slate-900"
+    >
+      <p>
+        Generated based on the report: "I Built a GPU Simulator from Scratch in
+        Python"
+      </p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+      // --- Dark Mode Logic ---
+      const themeToggleBtn = document.getElementById("theme-toggle");
+      const themeToggleBtnMobile = document.getElementById(
+        "theme-toggle-mobile"
+      );
+
+      // Check for saved user preference, if any, on load of the website
+      if (
+        localStorage.getItem("color-theme") === "dark" ||
+        (!("color-theme" in localStorage) &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches)
+      ) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+
+      function toggleTheme() {
+        // if set via local storage previously
+        if (localStorage.getItem("color-theme")) {
+          if (localStorage.getItem("color-theme") === "light") {
+            document.documentElement.classList.add("dark");
+            localStorage.setItem("color-theme", "dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+            localStorage.setItem("color-theme", "light");
+          }
+
+          // if NOT set via local storage previously
+        } else {
+          if (document.documentElement.classList.contains("dark")) {
+            document.documentElement.classList.remove("dark");
+            localStorage.setItem("color-theme", "light");
+          } else {
+            document.documentElement.classList.add("dark");
+            localStorage.setItem("color-theme", "dark");
+          }
+        }
+        updateChartTheme();
+      }
+
+      themeToggleBtn.addEventListener("click", toggleTheme);
+      themeToggleBtnMobile.addEventListener("click", toggleTheme);
+
+      // --- 1. State Management & Data ---
+      const archDetails = {
+        assembler: {
+          title: "1. The Assembler",
+          desc: "The Assembler bridges the gap between human logic and machine execution. It parses `.tgpu` files, handles label resolution for jumps, and outputs a clean list of instruction tuples.",
+          code: "def assemble(source):\n    # Pass 1: Find Labels\n    # Pass 2: Generate OpCodes\n    instructions = parse_lines(source)\n    return instructions",
+          color: "text-blue-600 dark:text-blue-400",
+        },
+        core: {
+          title: "2. The Core (TinyGPU)",
+          desc: "The heart of the simulator. It holds the state matrices: `Registers`, `Memory`, and `Program Counter`. The `step()` function executes one instruction across all active threads simultaneously using NumPy slicing.",
+          code: "class TinyGPU:\n    def __init__(self, threads):\n        # Vectorized State\n        self.registers = np.zeros((threads, 8))\n        self.pc = np.zeros(threads, dtype=int)\n        self.active = np.ones(threads, dtype=bool)",
+          color: "text-indigo-600 dark:text-indigo-400",
+        },
+        visualizer: {
+          title: "3. The Visualizer",
+          desc: 'A "Flight Recorder" for debugging. It doesn\'t run in real-time. Instead, it captures the state after every cycle and replays it as a Matplotlib animation, allowing you to pause and inspect race conditions.',
+          code: 'def visualize(history):\n    for state in history:\n        render_heatmap(state.memory)\n        render_pc(state.pc)\n    save_gif("debug.gif")',
+          color: "text-purple-600 dark:text-purple-400",
+        },
+      };
+
+      // --- 2. Architecture Interaction ---
+      function updateArchDetail(key) {
+        const data = archDetails[key];
+        const titleEl = document.getElementById("detail-title");
+        const descEl = document.getElementById("detail-desc");
+        const codeEl = document.getElementById("detail-code");
+
+        // Simple Fade Animation
+        const panel = document.getElementById("arch-detail");
+        panel.classList.add("opacity-50", "scale-95");
+
+        setTimeout(() => {
+          titleEl.textContent = data.title;
+          titleEl.className = `text-2xl font-bold mb-6 ${data.color}`;
+          descEl.textContent = data.desc;
+          codeEl.textContent = data.code;
+          panel.classList.remove("opacity-50", "scale-95");
+        }, 200);
+      }
+
+      // --- 3. Simulation Logic ---
+      const MEMORY_SIZE = 32;
+      let memoryData = [];
+      let isRunning = false;
+      let intervalId = null;
+      let currentAlgo = "sort";
+
+      // Algo State vars
+      let sortPhase = 0; // 0: Even, 1: Odd (for Sort)
+      let reductionStride = 1; // For Reduction
+      let vectorAddDone = false; // For Vector Add
+      let blockStride = 1; // For Block Sum
+      let comparisons = 0;
+
+      // Chart Configuration
+      const ctx = document.getElementById("memoryChart").getContext("2d");
+      const memoryChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: Array.from({ length: MEMORY_SIZE }, (_, i) => i),
+          datasets: [
+            {
+              label: "Memory Value",
+              data: [],
+              backgroundColor: [],
+              borderColor: "#4f46e5",
+              borderWidth: 1,
+              borderRadius: 4, // More rounded bars
+              barPercentage: 0.7,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 100 },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true,
+              backgroundColor: "rgba(15, 23, 42, 0.9)",
+              titleColor: "#fff",
+              bodyColor: "#fff",
+              padding: 10,
+              cornerRadius: 8,
+              displayColors: false,
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              grid: { display: false, drawBorder: false },
+              ticks: { display: false },
+            },
+            x: {
+              grid: { display: false, drawBorder: false },
+              ticks: { display: false },
+            },
+          },
+          layout: {
+            padding: { top: 10, bottom: 0 },
+          },
+        },
+      });
+
+      // Tradeoff Chart
+      const ctxTrade = document
+        .getElementById("tradeoffChart")
+        .getContext("2d");
+      const tradeoffChart = new Chart(ctxTrade, {
+        type: "bar",
+        data: {
+          labels: ["Real GPU", "TinyGPU"],
+          datasets: [
+            {
+              label: "Speed",
+              data: [100, 10],
+              backgroundColor: "#94a3b8",
+              borderRadius: 4,
+            },
+            {
+              label: "Observability",
+              data: [10, 100],
+              backgroundColor: "#6366f1",
+              borderRadius: 4,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: {
+                color: document.documentElement.classList.contains("dark")
+                  ? "#94a3b8"
+                  : "#64748b",
+                usePointStyle: true,
+              },
+            },
+          },
+          scales: {
+            x: { display: false },
+            y: {
+              grid: { display: false },
+              ticks: {
+                color: document.documentElement.classList.contains("dark")
+                  ? "#cbd5e1"
+                  : "#475569",
+                font: { weight: "bold" },
+              },
+            },
+          },
+        },
+      });
+
+      // Function to update chart colors based on theme
+      function updateChartTheme() {
+        const isDark = document.documentElement.classList.contains("dark");
+        const textColor = isDark ? "#cbd5e1" : "#475569";
+        const legendColor = isDark ? "#94a3b8" : "#64748b";
+
+        tradeoffChart.options.plugins.legend.labels.color = legendColor;
+        tradeoffChart.options.scales.y.ticks.color = textColor;
+        tradeoffChart.update();
+
+        // Re-render main chart to ensure background colors look good (though they are explicit RGBA)
+        memoryChart.update();
+      }
+
+      // --- Helper Functions ---
+      function initMemory(mode) {
+        currentAlgo = mode;
+        stopAutoRun();
+        comparisons = 0;
+        document.getElementById("sort-comparisons").textContent = "0";
+
+        if (mode === "sort" || mode === "reduction" || mode === "blocksum") {
+          // Random data
+          memoryData = Array.from(
+            { length: MEMORY_SIZE },
+            () => Math.floor(Math.random() * 80) + 10
+          );
+        } else if (mode === "vectoradd") {
+          // Structured data: First half A, second half B
+          const half = MEMORY_SIZE / 2;
+          memoryData = Array.from({ length: MEMORY_SIZE }, (_, i) =>
+            i < half
+              ? Math.floor(Math.random() * 40) + 10
+              : Math.floor(Math.random() * 40) + 10
+          );
+        }
+
+        // Reset Algo states
+        sortPhase = 0;
+        reductionStride = 1;
+        blockStride = 1;
+        vectorAddDone = false;
+
+        // Update Context Text
+        updateContextText(mode);
+        updateChart();
+        updateActiveMaskUI(new Array(MEMORY_SIZE).fill(false));
+        document.getElementById("sort-phase").textContent = "READY";
+      }
+
+      function updateContextText(mode) {
+        const title = document.getElementById("sim-description");
+        const detail = document.getElementById("sim-details");
+
+        if (mode === "sort") {
+          title.innerHTML =
+            "Recreating <strong>Odd-Even Transposition Sort</strong>.";
+          detail.textContent =
+            "Adjacent pairs are compared and swapped. Even indices first, then odd indices.";
+        } else if (mode === "reduction") {
+          title.innerHTML =
+            "Recreating <strong>Parallel Reduction (Sum)</strong>.";
+          detail.textContent =
+            "Values collapse into the first index. The 'Stride' doubles each step (1, 2, 4, 8...). Active threads halve each step.";
+        } else if (mode === "blocksum") {
+          title.innerHTML = "Recreating <strong>Block Shared Sum</strong>.";
+          detail.textContent =
+            "Simulating reduction within independent blocks of 8. Threads cooperate locally.";
+        } else if (mode === "vectoradd") {
+          title.innerHTML = "Recreating <strong>Vector Addition</strong>.";
+          detail.textContent =
+            "Splitting memory in half (Vector A & B). Threads add A[i] + B[i] simultaneously.";
+        }
+      }
+
+      function updateChart() {
+        memoryChart.data.datasets[0].data = memoryData;
+        // Colors: Different scheme for Vector Add to visualize split
+        if (currentAlgo === "vectoradd") {
+          const half = MEMORY_SIZE / 2;
+          memoryChart.data.datasets[0].backgroundColor = memoryData.map(
+            (v, i) =>
+              i < half
+                ? `rgba(99, 102, 241, ${0.4 + v / 150})`
+                : `rgba(236, 72, 153, ${0.4 + v / 150})`
+          );
+          memoryChart.data.datasets[0].borderColor = memoryData.map((v, i) =>
+            i < half ? `#6366f1` : `#ec4899`
+          );
+        } else {
+          memoryChart.data.datasets[0].backgroundColor = memoryData.map(
+            (v) => `rgba(99, 102, 241, ${0.4 + v / 150})`
+          );
+          memoryChart.data.datasets[0].borderColor = "#6366f1";
+        }
+        memoryChart.update();
+      }
+
+      function updateActiveMaskUI(activeArray) {
+        const container = document.getElementById("thread-mask");
+        container.innerHTML = "";
+        activeArray.forEach((active) => {
+          const dot = document.createElement("div");
+          dot.className = `flex-1 h-full rounded-sm transition-all duration-150 ${
+            active
+              ? "bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.5)]"
+              : "bg-slate-200 dark:bg-slate-800"
+          }`;
+          container.appendChild(dot);
+        });
+      }
+
+      // --- Step Logic Handlers ---
+
+      function stepSort() {
+        let activeThreads = new Array(MEMORY_SIZE).fill(false);
+        for (let i = sortPhase; i < MEMORY_SIZE - 1; i += 2) {
+          activeThreads[i] = true;
+          comparisons++;
+          if (memoryData[i] > memoryData[i + 1]) {
+            let temp = memoryData[i];
+            memoryData[i] = memoryData[i + 1];
+            memoryData[i + 1] = temp;
+          }
+        }
+        document.getElementById("sort-phase").textContent =
+          sortPhase === 0 ? "EVEN PHASE" : "ODD PHASE";
+        sortPhase = 1 - sortPhase;
+        updateActiveMaskUI(activeThreads);
+        return true;
+      }
+
+      function stepReduction() {
+        if (reductionStride >= MEMORY_SIZE) {
+          document.getElementById("sort-phase").textContent = "DONE";
+          updateActiveMaskUI(new Array(MEMORY_SIZE).fill(false));
+          return false;
+        }
+
+        let activeThreads = new Array(MEMORY_SIZE).fill(false);
+        let activeCount = 0;
+
+        for (let i = 0; i < MEMORY_SIZE; i++) {
+          // Check if this thread is a "receiver" in this stride
+          if (
+            i % (reductionStride * 2) === 0 &&
+            i + reductionStride < MEMORY_SIZE
+          ) {
+            activeThreads[i] = true;
+            activeCount++;
+            memoryData[i] += memoryData[i + reductionStride];
+            memoryData[i + reductionStride] = 0; // Clear the sourced value for visual clarity
+            comparisons++; // Treating addition as an 'op'
+          }
+        }
+
+        if (activeCount === 0) {
+          document.getElementById("sort-phase").textContent = "DONE";
+          return false;
+        }
+
+        document.getElementById(
+          "sort-phase"
+        ).textContent = `STRIDE ${reductionStride}`;
+        reductionStride *= 2;
+        updateActiveMaskUI(activeThreads);
+        return true;
+      }
+
+      function stepBlockSum() {
+        // Block size 8
+        const BLOCK_SIZE = 8;
+        if (blockStride >= BLOCK_SIZE) {
+          document.getElementById("sort-phase").textContent = "DONE";
+          updateActiveMaskUI(new Array(MEMORY_SIZE).fill(false));
+          return false;
+        }
+
+        let activeThreads = new Array(MEMORY_SIZE).fill(false);
+        let activeCount = 0;
+
+        for (let i = 0; i < MEMORY_SIZE; i++) {
+          // Local index within block
+          let localIdx = i % BLOCK_SIZE;
+          // Only operate if we are a receiver in the local block reduction tree
+          if (
+            localIdx % (blockStride * 2) === 0 &&
+            localIdx + blockStride < BLOCK_SIZE
+          ) {
+            activeThreads[i] = true;
+            activeCount++;
+            memoryData[i] += memoryData[i + blockStride];
+            memoryData[i + blockStride] = 0; // Visual clear
+            comparisons++;
+          }
+        }
+
+        if (activeCount === 0) {
+          document.getElementById("sort-phase").textContent = "DONE";
+          return false;
+        }
+
+        document.getElementById(
+          "sort-phase"
+        ).textContent = `LOCAL STRIDE ${blockStride}`;
+        blockStride *= 2;
+        updateActiveMaskUI(activeThreads);
+        return true;
+      }
+
+      function stepVectorAdd() {
+        if (vectorAddDone) {
+          document.getElementById("sort-phase").textContent = "DONE";
+          updateActiveMaskUI(new Array(MEMORY_SIZE).fill(false));
+          return false;
+        }
+
+        const half = MEMORY_SIZE / 2;
+        let activeThreads = new Array(MEMORY_SIZE).fill(false);
+
+        for (let i = 0; i < half; i++) {
+          activeThreads[i] = true;
+          memoryData[i] += memoryData[i + half];
+          // memoryData[i + half] = 0; // Optional: clear source B
+          comparisons++;
+        }
+
+        document.getElementById("sort-phase").textContent = "EXECUTING KERNEL";
+        vectorAddDone = true;
+        updateActiveMaskUI(activeThreads);
+        return true;
+      }
+
+      function performStep() {
+        let keepRunning = false;
+        if (currentAlgo === "sort") keepRunning = stepSort();
+        else if (currentAlgo === "reduction") keepRunning = stepReduction();
+        else if (currentAlgo === "blocksum") keepRunning = stepBlockSum();
+        else if (currentAlgo === "vectoradd") keepRunning = stepVectorAdd();
+
+        updateChart();
+        document.getElementById("sort-comparisons").textContent = comparisons;
+
+        if (!keepRunning && isRunning) stopAutoRun();
+      }
+
+      // --- 4. Event Listeners ---
+      document.getElementById("algo-select").addEventListener("change", (e) => {
+        initMemory(e.target.value);
+      });
+
+      document.getElementById("btn-step").addEventListener("click", () => {
+        if (isRunning) stopAutoRun();
+        performStep();
+      });
+
+      document.getElementById("btn-play").addEventListener("click", () => {
+        if (isRunning) {
+          stopAutoRun();
+        } else {
+          startAutoRun();
+        }
+      });
+
+      document.getElementById("btn-reset").addEventListener("click", () => {
+        initMemory(currentAlgo);
+      });
+
+      function startAutoRun() {
+        isRunning = true;
+        const btn = document.getElementById("btn-play");
+        btn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+        btn.classList.remove(
+          "bg-indigo-600",
+          "hover:bg-indigo-700",
+          "dark:bg-indigo-500",
+          "dark:hover:bg-indigo-400"
+        );
+        btn.classList.add(
+          "bg-amber-500",
+          "hover:bg-amber-600",
+          "dark:bg-amber-600",
+          "dark:hover:bg-amber-500"
+        );
+
+        intervalId = setInterval(() => {
+          performStep();
+        }, 300); // Slower for visibility
+      }
+
+      function stopAutoRun() {
+        isRunning = false;
+        clearInterval(intervalId);
+        const btn = document.getElementById("btn-play");
+        btn.innerHTML = '<i class="fas fa-play"></i> Auto Run';
+        btn.classList.add(
+          "bg-indigo-600",
+          "hover:bg-indigo-700",
+          "dark:bg-indigo-500",
+          "dark:hover:bg-indigo-400"
+        );
+        btn.classList.remove(
+          "bg-amber-500",
+          "hover:bg-amber-600",
+          "dark:bg-amber-600",
+          "dark:hover:bg-amber-500"
+        );
+      }
+
+      // --- 5. Gemini API Integration via Cloudflare Worker Proxy ---
+      // IMPORTANT: Replace this URL with your Cloudflare Worker URL after deployment
+      const GEMINI_PROXY_URL =
+        "https://tinygpu-gemini-proxy.dinethnethusahan.workers.dev";
+
+      async function callGemini(prompt, systemPrompt = "") {
+        let attempts = 0;
+        const maxAttempts = 3;
+        const delays = [1000, 2000, 4000];
+
+        while (attempts < maxAttempts) {
+          try {
+            const response = await fetch(GEMINI_PROXY_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt, systemPrompt }),
+            });
+
+            if (response.status === 429) {
+              throw new Error("Rate limit");
+            }
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(
+                errorData.error || `API Error: ${response.status}`
+              );
+            }
+
+            const data = await response.json();
+            return data.text || "No response generated.";
+          } catch (error) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              return "Error connecting to AI service. Please try again later.";
+            }
+            await new Promise((resolve) =>
+              setTimeout(resolve, delays[attempts - 1])
+            );
+          }
+        }
+      }
+
+      // Feature 1: AI Assembly Architect
+      document
+        .getElementById("btn-gen-assembly")
+        .addEventListener("click", async () => {
+          const input = document.getElementById("assembly-prompt").value;
+          if (!input.trim()) return;
+
+          const output = document.getElementById("assembly-output");
+          const loading = document.getElementById("ai-loading");
+
+          loading.classList.remove("hidden");
+          output.textContent = "";
+
+          const systemPrompt = `You are an expert on TinyGPU, a custom Python-based GPU simulator. 
+            The ISA includes:
+            - Registers: R0 to R7
+            - Arithmetic: ADD, SUB, MUL, DIV (Format: OP DEST, SRC1, SRC2)
+            - Memory: LD DEST, [ADDR_REG], ST [ADDR_REG], SRC_REG
+            - Control: CMP OP1, OP2 (Sets flags), BEQ LABEL, BNE LABEL, JMP LABEL, SYNC (Barrier)
+            - Comments start with ;
+            
+            Your task is to translate the user's natural language description of a parallel algorithm into hypothetical .tgpu assembly code. 
+            Provide heavily commented code explaining what each part does in the context of SIMT execution. 
+            Keep it educational.`;
+
+          const prompt = `Write a TinyGPU kernel for: ${input}`;
+          const result = await callGemini(prompt, systemPrompt);
+
+          loading.classList.add("hidden");
+          output.textContent = result;
+        });
+
+      // Feature 2: Concept Explainer
+      async function explainConcept(concept) {
+        const modal = document.getElementById("ai-modal");
+        const content = document.getElementById("ai-modal-content");
+
+        modal.classList.remove("hidden");
+        // Show loading state
+        content.innerHTML =
+          '<span class="typing-indicator text-indigo-500 dark:text-indigo-400"><span></span><span></span><span></span></span>';
+
+        const systemPrompt =
+          "You are a friendly computer science tutor specializing in GPUs and Parallel Computing. Explain concepts simply, using analogies (like cooking, traffic, or office work) suitable for a beginner. Keep explanations under 4 sentences.";
+        const prompt = `Explain the concept of "${concept}" in the context of the TinyGPU simulator and parallel programming.`;
+
+        const result = await callGemini(prompt, systemPrompt);
+        content.textContent = result;
+      }
+
+      function closeAiModal() {
+        document.getElementById("ai-modal").classList.add("hidden");
+      }
+
+      // Initialize First Algorithm
+      initMemory("sort");
+      updateChartTheme(); // Set initial theme
+    </script>
+  </body>
+</html>
