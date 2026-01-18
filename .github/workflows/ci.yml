@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, master, dev ]
 
+# Explicitly set minimal permissions following least privilege principle
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,16 +19,16 @@ jobs:
         python-version: [ "3.11", "3.12", "3.13" ]
 
     steps:
-      - name: 🧰 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - name: 📦 Install dependencies (including dev extras)
+      - name: Install dependencies (including dev extras)
         run: |
           python -m pip install --upgrade pip
           pip install -e .[dev]
@@ -33,19 +37,19 @@ jobs:
       # -----------------------------
       # Code quality
       # -----------------------------
-      - name: 🧹 Run Ruff linter (auto-fix mode)
+      - name: Run Ruff linter (auto-fix mode)
         run: |
           ruff check . --fix
         continue-on-error: false
 
-      - name: 🎨 Check formatting (Black)
+      - name: Check formatting (Black)
         run: |
           black --check src examples tests
 
       # -----------------------------
       # Tests
       # -----------------------------
-      - name: 🧪 Install package (editable) and run pytest
+      - name: Install package (editable) and run pytest
         run: |
           pip install -e .[dev]
           echo "Listing repo files:"; ls -la
